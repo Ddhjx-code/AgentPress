@@ -20,7 +20,7 @@
 ## 🚀 快速开始
 
 ### 1. 克隆项目
-git clone https://github.com/your-username/AgentPress.git
+git clone https://github.com/Ddhjx-code/AgentPress.git
 cd AgentPress
 
 ### 2. 安装依赖

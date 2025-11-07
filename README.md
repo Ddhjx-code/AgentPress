@@ -20,7 +20,7 @@
 ## 🚀 Quick Start
 
 ### 1. Clone the repository
-git clone https://github.com/your-username/AgentPress.git
+git clone https://github.com/Ddhjx-code/AgentPress.git
 cd AgentPress
 
 ### 2. Install dependencies
