@@ -7,7 +7,124 @@ from autogen_agentchat.agents import AssistantAgent
 from utils import extract_content, extract_all_json, calculate_average_score, format_feedback_summary
 from agents_manager import AgentsManager
 from conversation_manager import ConversationManager
-from config import GROUPCHAT_CONFIGS, SCORE_THRESHOLD, MAX_REVISION_ROUNDS
+from config import GROUPCHAT_CONFIGS, SCORE_THRESHOLD, MAX_REVISION_ROUNDS,CREATION_CONFIG
+
+
+class DocumentationManager:
+    """故事档案管理（维护一致性）"""
+    
+    def __init__(self, doc_agent: AssistantAgent):
+        self.doc_agent = doc_agent
+        self.characters = {}      # 人物档案
+        self.timeline = []        # 时间线
+        self.world_rules = {}     # 世界观规则
+        self.foreshadowing = []   # 伏笔清单
+        self.chapters_summary = []  # 章节摘要
+    
+    async def extract_chapter_info(self, chapter: str, chapter_num: int) -> Dict[str, Any]:
+        """从章节提取信息并更新档案"""
+        
+        task = f"""
+请从以下第 {chapter_num} 章的内容中提取信息，并按照你的系统提示词中要求的 JSON 格式返回。
+
+【第 {chapter_num} 章内容】
+{chapter}
+        """
+        
+        result = await self.doc_agent.run(task=task)
+        content = extract_content(result.messages)
+        data = self._extract_json(content)
+        
+        if data:
+            self._update_records(data)
+        
+        return data
+    
+    async def check_consistency(self, chapter: str, chapter_num: int) -> Dict[str, Any]:
+        """检查新章节是否与档案一致"""
+        
+        current_summary = self._get_summary()
+        
+        task = f"""
+请检查以下新章节是否与已建立的档案一致。
+
+【当前档案摘要】
+{current_summary}
+
+【第 {chapter_num} 章新内容】
+{chapter[:2000]}
+        """
+        
+        result = await self.doc_agent.run(task=task)
+        content = extract_content(result.messages)
+        data = self._extract_json(content)
+        
+        return data or {"is_consistent": True, "overall_score": 100}
+    
+    def get_summary(self) -> str:
+        """获取档案摘要供 Writer 查看"""
+        
+        summary = f"""
+【已有人物】
+"""
+        for name, info in self.characters.items():
+            summary += f"- {name}: {info.get('personality', '')}\n"
+        
+        summary += f"\n【时间线进度】\n"
+        if self.chapters_summary:
+            summary += f"已创作 {len(self.chapters_summary)} 章\n"
+            summary += f"总计约 {sum(s.get('word_count', 0) for s in self.chapters_summary)} 字\n"
+        
+        summary += f"\n【已建立的规则】\n"
+        for rule_name, rule_desc in self.world_rules.items():
+            summary += f"- {rule_name}: {rule_desc}\n"
+        
+        summary += f"\n【待回收伏笔】\n"
+        pending = [f for f in self.foreshadowing if not f.get('resolved')]
+        summary += f"共 {len(pending)} 个\n"
+        
+        return summary
+    
+    def _update_records(self, chapter_data: Dict):
+        """更新档案记录"""
+        
+        # 更新人物
+        if "characters" in chapter_data:
+            self.characters.update(chapter_data["characters"])
+        
+        # 更新世界观规则
+        if "world_rules" in chapter_data:
+            new_rules = chapter_data["world_rules"]
+            if isinstance(new_rules, dict):
+                self.world_rules.update(new_rules)
+        
+        # 更新伏笔
+        if "foreshadowing" in chapter_data:
+            foreshadowing = chapter_data["foreshadowing"]
+            if isinstance(foreshadowing, dict):
+                self.foreshadowing.extend(foreshadowing.get("new", []))
+                # 标记已回收的伏笔
+                for resolved in foreshadowing.get("resolved", []):
+                    for fs in self.foreshadowing:
+                        if fs.get("content") == resolved.get("content"):
+                            fs["resolved"] = True
+        
+        # 保存章节摘要
+        if "chapter_summary" in chapter_data:
+            self.chapters_summary.append({
+                "chapter_num": chapter_data.get("chapter_num"),
+                "summary": chapter_data["chapter_summary"]
+            })
+    
+    def _get_summary(self) -> str:
+        """内部使用的摘要"""
+        return self.get_summary()
+    
+    def _extract_json(self, text: str) -> Dict[str, Any]:
+        """从文本中提取JSON"""
+        json_objects = extract_all_json(text)
+        return json_objects[0] if json_objects else {}
+    
 
 class NovelWritingPhases:
     """网络小说创作工作流的各个阶段"""
@@ -15,6 +132,7 @@ class NovelWritingPhases:
     def __init__(self, agents_manager: AgentsManager, conversation_manager: ConversationManager):
         self.agents = agents_manager
         self.conversation = conversation_manager
+        self.documentation = None
     
     async def phase1_research_and_planning(self, novel_concept: str) -> Dict[str, Any]:
         """第一阶段：创意研究和规划"""
@@ -133,7 +251,19 @@ class NovelWritingPhases:
         return research_data
     
     async def phase2_creation(self, research_data: Dict[str, Any]) -> str:
-        """第二阶段：初稿创作"""
+        """第二阶段：初稿创作（单章或多章）"""
+        
+        num_chapters = CREATION_CONFIG.get("num_chapters", 1)
+        
+        if num_chapters == 1:
+            # 原有的单章模式
+            return await self._phase2_single_chapter(research_data)
+        else:
+            # 新的分章节模式
+            return await self._phase2_multiple_chapters(research_data, num_chapters)
+    
+    async def _phase2_single_chapter(self, research_data: Dict[str, Any]) -> str:
+        """创作单章（原有逻辑）"""
         print("\n" + "="*60)
         print("✍️  第二阶段：初稿创作")
         print("="*60)
@@ -160,6 +290,152 @@ class NovelWritingPhases:
         
         return story
     
+    async def _phase2_multiple_chapters(self, research_data: Dict[str, Any], num_chapters: int) -> str:
+        """分章节创作（新模式）"""
+        print("\n" + "="*60)
+        print(f"✍️  第二阶段：分章节创作（{num_chapters} 章）")
+        print("="*60)
+        
+        # 初始化档案员
+        doc_agent = self.agents.get_agent("documentation_specialist")
+        if not doc_agent:
+            print("⚠️  档案员不可用，继续创作但无法维护一致性")
+        
+        
+        if doc_agent:
+            self.documentation = DocumentationManager(doc_agent)
+        
+        writer = self.agents.get_agent("writer")
+        chapters = []
+        
+        target_length = CREATION_CONFIG.get("target_length_per_chapter", 2000)
+        
+        for chapter_num in range(1, num_chapters + 1):
+            print(f"\n--- 第 {chapter_num}/{num_chapters} 章 ---")
+            
+            # 1. 准备创作上下文
+            context = self._prepare_chapter_context(
+                chapter_num=chapter_num,
+                research_data=research_data,
+                previous_chapters=chapters,
+                target_length=target_length
+            )
+            
+            # 2. Writer 创作
+            print(f"   ✍️  创作中...")
+            chapter_result = await writer.run(task=context)
+            chapter = extract_content(chapter_result.messages)
+            chapters.append(chapter)
+            
+            print(f"   ✅ 完成（{len(chapter)} 字）")
+            
+            # 3. 档案员提取信息
+            if self.documentation:
+                print(f"   📋 更新档案...")
+                chapter_info = await self.documentation.extract_chapter_info(chapter, chapter_num)
+                
+                # 4. 档案员检查一致性
+                print(f"   🔍 检查一致性...")
+                consistency = await self.documentation.check_consistency(chapter, chapter_num)
+
+                self.conversation.add_documentation(
+                    chapter_num=chapter_num,
+                    extraction_info=chapter_info,
+                    consistency_check=consistency
+                )
+                
+                score = consistency.get("overall_score", 100)
+                
+                if score < 80:
+                    print(f"   ⚠️  一致性评分 {score:.0f}，修订中...")
+                    
+                    # 让 Writer 修改
+                    fix_context = self._prepare_fix_context(
+                        chapter=chapter,
+                        consistency_issues=consistency.get("issues", []),
+                        documentation=self.documentation.get_summary()
+                    )
+                    
+                    fix_result = await writer.run(task=fix_context)
+                    chapter = extract_content(fix_result.messages)
+                    chapters[-1] = chapter
+                    
+                    # 重新更新档案
+                    chapter_info = await self.documentation.extract_chapter_info(chapter, chapter_num)
+                
+                print(f"   一致性评分: {score:.0f}")
+            
+            self.conversation.add_story_version(chapter_num, chapter)
+        
+        # 合并所有章节
+        full_story = "\n\n".join(chapters)
+        
+        print(f"\n{'='*60}")
+        print(f"✅ 创作完成！共 {len(chapters)} 章，{len(full_story)} 字")
+        
+        return full_story
+    
+    def _prepare_chapter_context(self, chapter_num: int, research_data: Dict, 
+                                previous_chapters: List[str], target_length: int) -> str:
+        """准备某一章的创作上下文"""
+        
+        context = f"""
+根据以下信息创作第 {chapter_num} 章：
+
+【故事背景】
+{json.dumps(research_data, ensure_ascii=False, indent=2)[:1000]}
+
+【前面的故事】
+"""
+        
+        if previous_chapters:
+            # 只保留最后一章的摘要，避免 Token 过多
+            context += f"（前 {len(previous_chapters)} 章已完成，最后一章摘要如下）\n"
+            context += previous_chapters[-1][:1000] + "...\n"
+        else:
+            context += "（这是第一章，请精彩开局）\n"
+        
+        context += f"""
+【已有档案】
+"""
+        
+        if self.documentation:
+            context += self.documentation.get_summary()
+        
+        context += f"""
+
+【创作要求】
+- 字数：约 {target_length} 字
+- 风格：网络文学风格，引人入胜
+- 要求：推进情节，与前面内容一致
+- 结尾：留下悬念，吸引继续阅读
+- 直接输出故事文本（不要JSON）
+        """
+        
+        return context
+    
+
+    def _prepare_fix_context(self, chapter: str, consistency_issues: List[Dict], 
+                            documentation: str) -> str:
+        """准备修改时的上下文"""
+        
+        task = f"""
+    根据以下一致性问题修改章节：
+
+    【一致性问题】
+    {json.dumps(consistency_issues, ensure_ascii=False, indent=2)}
+
+    【当前档案】
+    {documentation}
+
+    【原章节】
+    {chapter}
+
+    请修改上述问题，直接输出修改后的完整章节文本。
+        """
+        
+        return task
+
     async def phase3_review_and_refinement(self, story: str, research_data: Dict[str, Any]) -> str:
         """第三阶段：多轮评审和修订"""
         print("\n" + "="*60)

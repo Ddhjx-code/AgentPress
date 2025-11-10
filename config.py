@@ -27,6 +27,10 @@ AGENT_CONFIGS = {
     "editor": {
         "display_name": "📝 文学编辑",
         "description": "评价整体质量"
+    },
+    "documentation_specialist": {
+        "display_name": "📋 档案员",
+        "description": "维护故事一致性和人物档案"
     }
 }
 
@@ -42,6 +46,13 @@ GROUPCHAT_CONFIGS = {
         "max_turns": 5,
         "description": "评审和修订"
     }
+}
+
+# 创作配置
+CREATION_CONFIG = {
+    "num_chapters": 3,         # 总章数
+    "target_length_per_chapter": 3000,  # 每章目标字数
+    "total_target_length": 9000  # 总目标字数
 }
 
 # 评分阈值

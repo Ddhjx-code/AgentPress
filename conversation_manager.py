@@ -22,6 +22,15 @@ class ConversationManager:
         }
         self.conversation_history.append(record)
 
+    def add_documentation(self, chapter_num: int, extraction_info: Dict, 
+                         consistency_check: Dict):
+        """记录档案员的提取和检查结果"""
+        self.documentation_records.append({
+            "chapter_num": chapter_num,
+            "timestamp": datetime.now().isoformat(),
+            "extraction": extraction_info,      # 提取的人物、时间线等
+            "consistency_check": consistency_check  # 一致性检查结果
+        })
     
     def add_story_version(self, version: int, content: str, metadata: Dict = None):
         """添加故事版本"""

@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from autogen_ext.models.openai import OpenAIChatCompletionClient
 from autogen_core.models import ModelInfo, ModelFamily
 
-from config import MODEL_CONFIG, PROMPTS_DIR, OUTPUT_DIR
+from config import MODEL_CONFIG, PROMPTS_DIR, OUTPUT_DIR, CREATION_CONFIG
 from utils import load_all_prompts, save_json, save_text
 from agents_manager import AgentsManager
 from conversation_manager import ConversationManager
@@ -71,6 +71,13 @@ async def main():
     # 初始化流程管理器
     phases = NovelWritingPhases(agents_manager, conversation_manager)
     
+    # 显示创作配置
+    print(f"\n⚙️  创作配置:")
+    print(f"   创作模式: {'分章节模式' if CREATION_CONFIG['num_chapters'] > 1 else '单章模式'}")
+    print(f"   总章数: {CREATION_CONFIG['num_chapters']}")
+    print(f"   每章目标字数: {CREATION_CONFIG['target_length_per_chapter']} 字")
+    print(f"   总目标字数: {CREATION_CONFIG['total_target_length']} 字")
+    
     # 获取用户输入
     print("\n" + "="*60)
     print("📝 请输入你的小说创意")
@@ -112,7 +119,8 @@ async def main():
         history_data = {
             "conversations": conversation_manager.conversation_history,
             "versions": conversation_manager.story_versions,
-            "feedbacks": conversation_manager.feedback_records
+            "feedbacks": conversation_manager.feedback_records,
+            "documentation": conversation_manager.documentation_records
         }
         save_json(history_data, history_file)
         
@@ -125,6 +133,7 @@ async def main():
         print(f"  • 创建版本数: {final_output['summary']['total_versions']}")
         print(f"  • 评审轮数: {final_output['summary']['total_feedback_rounds']}")
         print(f"  • 对话轮数: {final_output['summary']['total_conversations']}")
+        print(f"  • 创作模式: {'分章节模式' if CREATION_CONFIG['num_chapters'] > 1 else '单章模式'}")
         
         if final_output['final_check']:
             print(f"  • 发布就绪: {final_output['final_check'].get('ready_for_publication', False)}")
