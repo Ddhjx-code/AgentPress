@@ -238,22 +238,74 @@ class NovelWritingPhases:
         """按顺序进行评审"""
         feedback = {}
         
-        reviewers = [
-            ("fact_checker", self.agents.get_agent("fact_checker")),
-            ("dialogue_specialist", self.agents.get_agent("dialogue_specialist")),
-            ("editor", self.agents.get_agent("editor"))
-        ]
+        print(f"\n📋 启动评审流程...")
+        print(f"   评审故事长度: {len(story)} 字符")
         
-        for idx, (name, agent) in enumerate(reviewers, 1):
-            if not agent:
-                print(f"   [{idx}/3] {name} 不可用")
-                continue
-            
-            print(f"   [{idx}/3] {name} 评审中...")
-            # 执行评审...
-            print(f"      ✅ 完成，评分: {feedback[name].get('score', 'N/A')}")
+        # 事实核查
+        fact_checker = self.agents.get_agent("fact_checker")
+        if fact_checker:
+            print(f"\n   [1/3] 事实核查员评审中...")
+            fact_task = f"""
+    请评审以下故事：
+
+    【故事内容】
+    {story[:1500]}
+            """
+            try:
+                fact_result = await fact_checker.run(task=fact_task)
+                fact_content = extract_content(fact_result.messages)
+                feedback["fact_checker"] = self._extract_json_single(fact_content)
+                if "score" not in feedback["fact_checker"]:
+                    feedback["fact_checker"]["score"] = 50
+                print(f"      ✅ 完成，评分: {feedback['fact_checker'].get('score', 'N/A')}")
+            except Exception as e:
+                print(f"      ❌ 错误: {e}")
+                feedback["fact_checker"] = {"score": 50, "issues": ["评审出错"], "suggestions": []}
+        
+        # 对话评审
+        dialogue = self.agents.get_agent("dialogue_specialist")
+        if dialogue:
+            print(f"\n   [2/3] 对话专家评审中...")
+            dialogue_task = f"""
+    请评审以下故事的对话质量：
+
+    【故事内容】
+    {story[:1500]}
+            """
+            try:
+                dialogue_result = await dialogue.run(task=dialogue_task)
+                dialogue_content = extract_content(dialogue_result.messages)
+                feedback["dialogue_specialist"] = self._extract_json_single(dialogue_content)
+                if "score" not in feedback["dialogue_specialist"]:
+                    feedback["dialogue_specialist"]["score"] = 50
+                print(f"      ✅ 完成，评分: {feedback['dialogue_specialist'].get('score', 'N/A')}")
+            except Exception as e:
+                print(f"      ❌ 错误: {e}")
+                feedback["dialogue_specialist"] = {"score": 50, "issues": ["评审出错"], "suggestions": []}
+        
+        # 文学编辑评审
+        editor = self.agents.get_agent("editor")
+        if editor:
+            print(f"\n   [3/3] 文学编辑评审中...")
+            editor_task = f"""
+    请评审以下故事的文学质量：
+
+    【故事内容】
+    {story[:1500]}
+            """
+            try:
+                editor_result = await editor.run(task=editor_task)
+                editor_content = extract_content(editor_result.messages)
+                feedback["editor"] = self._extract_json_single(editor_content)
+                if "score" not in feedback["editor"]:
+                    feedback["editor"]["score"] = 50
+                print(f"      ✅ 完成，评分: {feedback['editor'].get('score', 'N/A')}")
+            except Exception as e:
+                print(f"      ❌ 错误: {e}")
+                feedback["editor"] = {"score": 50, "issues": ["评审出错"], "suggestions": []}
         
         return feedback
+
 
     
     async def phase4_final_check(self, story: str) -> Dict[str, Any]:
