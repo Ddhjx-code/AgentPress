@@ -133,6 +133,39 @@ class NovelWritingPhases:
         self.agents = agents_manager
         self.conversation = conversation_manager
         self.documentation = None
+
+    async def _intermediate_review(self, chapters: List[str], checkpoint_num: int,
+                                start_chapter_num: int) -> Dict[str, Any]:
+        """中期评审：评审多个章节的整体质量"""
+        
+        end_chapter_num = start_chapter_num + len(chapters) - 1
+        
+        # 合并要评审的章节
+        merged_text = "\n\n".join([
+            f"【第 {start_chapter_num + i} 章】\n{chapter}"
+            for i, chapter in enumerate(chapters)
+        ])
+        
+        # 用 Editor 进行整体评审
+        editor = self.agents.get_agent("editor")
+        
+        # ← 简化！只说任务，不说格式要求
+        task = f"""
+    请对以下故事第 {start_chapter_num}-{end_chapter_num} 章进行中期评审。
+
+    【故事内容】
+    {merged_text[:5000]}
+
+    【任务】
+    这是一个中期评审任务，请按照你的系统提示词中的中期评审格式返回结果。
+        """
+        
+        result = await editor.run(task=task)
+        content = extract_content(result.messages)
+        review_data = self._extract_json_single(content)
+        
+        return review_data
+
     
     async def phase1_research_and_planning(self, novel_concept: str) -> Dict[str, Any]:
         """第一阶段：创意研究和规划"""
@@ -307,6 +340,8 @@ class NovelWritingPhases:
         
         writer = self.agents.get_agent("writer")
         chapters = []
+        checkpoint_interval = 3  # 每 3 章做一次中期评审
+        checkpoint_num = 1
         
         target_length = CREATION_CONFIG.get("target_length_per_chapter", 2000)
         
@@ -346,7 +381,7 @@ class NovelWritingPhases:
                 
                 score = consistency.get("overall_score", 100)
                 
-                if score < 80:
+                if score < 90:
                     print(f"   ⚠️  一致性评分 {score:.0f}，修订中...")
                     
                     # 让 Writer 修改
@@ -364,6 +399,37 @@ class NovelWritingPhases:
                     chapter_info = await self.documentation.extract_chapter_info(chapter, chapter_num)
                 
                 print(f"   一致性评分: {score:.0f}")
+            
+            if chapter_num % checkpoint_interval == 0 or chapter_num == num_chapters:
+                # 需要做中期评审
+                print(f"\n🔍 执行中期评审（Checkpoint {checkpoint_num}）...")
+                
+                start_chapter = chapter_num - checkpoint_interval + 1
+                review_chapters = chapters[-checkpoint_interval:]
+                
+                intermediate_review = await self._intermediate_review(
+                    review_chapters,
+                    checkpoint_num=checkpoint_num,
+                    start_chapter_num=start_chapter
+                )
+                
+                review_score = intermediate_review.get("overall_quality_score", 0)
+                print(f"   中期评审评分: {review_score}/100")
+                print(f"   问题数: {len(intermediate_review.get('issues', []))}")
+                
+                # 保存中期评审结果
+                self.conversation.add_conversation(
+                    f"intermediate_review_checkpoint_{checkpoint_num}",
+                    json.dumps(intermediate_review, ensure_ascii=False, indent=2)
+                )
+                
+                # 如果评分过低，可以决定是否继续
+                if review_score < 70:
+                    print(f"\n⚠️  评分较低 ({review_score}/100)，建议修改策略")
+                    # 可选：暂停并要求调整
+                    # 或继续但记录警告
+                
+                checkpoint_num += 1
             
             self.conversation.add_story_version(chapter_num, chapter)
         
@@ -599,22 +665,8 @@ class NovelWritingPhases:
 {story}
 ---故事结束---
 
-检查以下方面（JSON格式输出）：
-1. 是否有明显的语法或拼写错误
-2. 故事逻辑是否完整
-3. 是否适合网络文学平台发布
-4. 整体评分
-
-返回格式：
-{{
-  "ready_for_publication": true/false,
-  "final_score": 0-100,
-  "grammar_issues": [],
-  "logic_issues": [],
-  "overall_comments": "总体评价",
-  "reader_appeal": "预期吸引力1-10"
-}}
-        """
+这是一个最终检查任务，请按照你的系统提示词中的格式返回结果。
+"""
         
         check_result = await editor.run(task=final_check_task)
         check_content = extract_content(check_result.messages)
