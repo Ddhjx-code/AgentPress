@@ -61,6 +61,10 @@ htmlcov/
 
 # Output files
 output/
+
+# docs plan
+docs/plan
+
 # Specific generated files to ignore
 conversation_history.json
 novel_data.json
