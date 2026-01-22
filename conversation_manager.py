@@ -1,4 +1,3 @@
-# conversation_manager.py
 from typing import Dict, Any, List
 from datetime import datetime
 from utils import extract_content, extract_all_json, calculate_average_score
@@ -10,6 +9,7 @@ class ConversationManager:
         self.conversation_history: List[Dict[str, Any]] = []
         self.story_versions: List[Dict[str, Any]] = []
         self.feedback_records: List[Dict[str, Any]] = []
+        self.documentation_records: List[Dict[str, Any]] = []  # ✅ 已添加
     
     def add_conversation(self, phase: str, conversation: str, metadata: Dict = None):
         """添加对话记录"""
@@ -25,7 +25,7 @@ class ConversationManager:
     def add_documentation(self, chapter_num: int, extraction_info: Dict, 
                          consistency_check: Dict):
         """记录档案员的提取和检查结果"""
-        self.documentation_records.append({
+        self.documentation_records.append({  # ✅ 现在可以正确使用
             "chapter_num": chapter_num,
             "timestamp": datetime.now().isoformat(),
             "extraction": extraction_info,      # 提取的人物、时间线等
@@ -85,5 +85,6 @@ class ConversationManager:
             "total_conversations": len(self.conversation_history),
             "total_versions": len(self.story_versions),
             "total_feedback_rounds": len(self.feedback_records),
+            "total_documentation_records": len(self.documentation_records),  # ✅ 新增
             "avg_scores": [r["avg_score"] for r in self.feedback_records]
         }
