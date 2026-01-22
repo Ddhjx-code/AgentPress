@@ -1,6 +1,6 @@
 from src.novel_phases_manager import NovelWritingPhases
 from src.documentation_manager import DocumentationManager
-from conversation_manager import ConversationManager
+from core.conversation_manager import ConversationManager
 
 
 class NovelWorkflowOrchestrator:

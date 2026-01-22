@@ -1,8 +1,8 @@
 import json
 import asyncio
 from typing import List, Dict, Any
-from agents_manager import AgentsManager
-from conversation_manager import ConversationManager
+from core.agent_manager import AgentManager
+from core.conversation_manager import ConversationManager
 from src.documentation_manager import DocumentationManager
 from config import GROUPCHAT_CONFIGS, CREATION_CONFIG, SCORE_THRESHOLD, MAX_REVISION_ROUNDS
 from utils import extract_content, extract_all_json, calculate_average_score, format_feedback_summary
