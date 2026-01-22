@@ -57,6 +57,17 @@ async def main():
 
     print(f"✅ 加载了 {len(prompts)} 个提示词")
 
+    # 初始化AgentManager并加载代理
+    print("\n🤖 初始化智能代理...")
+    from core.agent_manager import AgentManager, ModelConfig
+    agent_manager = AgentManager(model_client=model_client)
+
+    # 加载提示词文件并初始化代理
+    agent_init_success = await agent_manager.initialize(prompts)
+    if not agent_init_success:
+        print("❌ 代理初始化失败")
+        return
+
     # 初始化 orchestrator (this will create conversation manager and documentation manager internally)
     print("\n🔧 初始化工作流orchestrator...")
     orchestrator = NovelWorkflowOrchestrator()
@@ -85,11 +96,20 @@ async def main():
     try:
         # Note: Our orchestrator needs to call async methods as needed based on the current architecture
         # For now we'll call a simplified version - in proper implementation this would work asynchronously
-        final_output = orchestrator.run_complete_workflow(
-            initial_idea=novel_concept,
-            multi_chapter=CREATION_CONFIG['num_chapters'] > 1,
-            total_chapters=CREATION_CONFIG['num_chapters']
-        )
+        # But if we have an agent_manager, let's use the async workflow
+        if agent_manager and agent_manager.is_initialized():
+            final_output = await orchestrator.run_async_workflow(
+                initial_idea=novel_concept,
+                multi_chapter=CREATION_CONFIG['num_chapters'] > 1,
+                total_chapters=CREATION_CONFIG['num_chapters'],
+                agents_manager=agent_manager
+            )
+        else:
+            final_output = orchestrator.run_complete_workflow(
+                initial_idea=novel_concept,
+                multi_chapter=CREATION_CONFIG['num_chapters'] > 1,
+                total_chapters=CREATION_CONFIG['num_chapters']
+            )
 
         # 保存结果
         print("\n" + "="*60)

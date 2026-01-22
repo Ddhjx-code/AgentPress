@@ -1,8 +1,10 @@
 # core/agent_manager.py
+import os
 from typing import Dict, List, Optional, Any, Union
 from autogen_agentchat.agents import AssistantAgent
 from autogen_ext.models.openai import OpenAIChatCompletionClient
 from config import AGENT_CONFIGS
+from utils import extract_content, extract_all_json
 import asyncio
 
 
@@ -71,7 +73,8 @@ class ModelConfig:
 class AgentManager:
     """Updated Agent Manager with model-specific allocation"""
 
-    def __init__(self, model_configs: Optional[ModelConfig] = None):
+    def __init__(self, model_client, model_configs: Optional[ModelConfig] = None):
+        self.model_client = model_client
         self.model_configs = model_configs or ModelConfig()
         self.agents = {}
 

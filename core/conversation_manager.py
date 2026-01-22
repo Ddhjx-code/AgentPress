@@ -88,3 +88,12 @@ class ConversationManager:
             "total_documentation_records": len(self.documentation_records),  # ✅ 新增
             "avg_scores": [r["avg_score"] for r in self.feedback_records]
         }
+
+    def get_all_history(self) -> Dict[str, Any]:
+        """获取完整的对话历史"""
+        return {
+            "conversations": self.conversation_history,
+            "versions": self.story_versions,
+            "feedbacks": self.feedback_records,
+            "documentations": self.documentation_records
+        }
