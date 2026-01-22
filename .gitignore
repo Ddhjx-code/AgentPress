@@ -58,3 +58,16 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Output files
+output/
+
+# docs plan
+docs/plan
+
+# Specific generated files to ignore
+conversation_history.json
+novel_data.json
+novel_story.txt
+final_output.json
+final_story.md

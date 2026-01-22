@@ -1,0 +1,193 @@
+<!-- ui/templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgentPress Enhanced - AI Story Generator</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">AgentPress Enhanced</a>
+            <div class="navbar-nav">
+                <a class="nav-link" href="#workflow">Workflow</a>
+                <a class="nav-link" href="#agents">Agents</a>
+                <a class="nav-link" href="#knowledge">Knowledge</a>
+                <a class="nav-link" href="#settings">Settings</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <h1>AgentPress Enhanced</h1>
+                <p class="lead">AI-Powered Story Generation Platform with Knowledge Base and Model Flexibility</p>
+            </div>
+        </div>
+
+        <div class="row mt-4" id="workflow">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Story Creation Workflow</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="storyIdea" class="form-label">Enter your story idea (1-2萬字):</label>
+                            <textarea class="form-control" id="storyIdea" rows="3" placeholder="Describe your story idea..."></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="storyTheme" class="form-label">Story Theme:</label>
+                            <select class="form-select" id="storyTheme">
+                                <option value="mythological">Mythological (not just Shanhai Jing)</option>
+                                <option value="fantasy">Fantasy</option>
+                                <option value="science_fiction">Science Fiction</option>
+                                <option value="realistic_fiction">Realistic Fiction</option>
+                                <option value="historical">Historical</option>
+                                <option value="contemporary">Contemporary</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                        <button id="startCreation" class="btn btn-primary">Start Story Creation</button>
+                        <div id="creationProgress" class="mt-3" style="display: none;">
+                            <div class="progress">
+                                <div class="progress-bar" role="progressbar" style="width: 25%" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100">25%</div>
+                            </div>
+                            <p>Processing...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Quick Info</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Target Length:</strong> 1-2萬字</p>
+                        <p><strong>Supported Genres:</strong> All genres supported</p>
+                        <p><strong>AI Agents:</strong> Multi-role collaboration</p>
+                        <p><strong>Knowledge Base:</strong> Dynamic content enhancement</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4" id="agents">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>AI Agent Management</h5>
+                    </div>
+                    <div class="card-body">
+                        <h6>Select Models for Each Agent:</h6>
+                        <div class="table-responsive">
+                            <table class="table" id="agentModelTable">
+                                <thead>
+                                    <tr>
+                                        <th>Agent Role</th>
+                                        <th>Current Model</th>
+                                        <th>Capabilities</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Writer</td>
+                                        <td><input type="text" class="form-control" value="gpt-4" id="writerModel"></td>
+                                        <td>Creative generation, narrative structure</td>
+                                        <td><button class="btn btn-sm btn-outline-primary">Change</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Mythologist/Researcher</td>
+                                        <td><input type="text" class="form-control" value="gpt-4" id="researcherModel"></td>
+                                        <td>Background research, setting development</td>
+                                        <td><button class="btn btn-sm btn-outline-primary">Change</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Fact Checker</td>
+                                        <td><input type="text" class="form-control" value="gpt-4" id="factCheckerModel"></td>
+                                        <td>Logic verification, consistency check</td>
+                                        <td><button class="btn btn-sm btn-outline-primary">Change</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Dialogue Specialist</td>
+                                        <td><input type="text" class="form-control" value="gpt-4" id="dialogueModel"></td>
+                                        <td>Dialogue quality, character voice</td>
+                                        <td><button class="btn btn-sm btn-outline-primary">Change</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Editor</td>
+                                        <td><input type="text" class="form-control" value="gpt-4" id="editorModel"></td>
+                                        <td>Quality assessment, final refinement</td>
+                                        <td><button class="btn btn-sm btn-outline-primary">Change</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Documentation Specialist</td>
+                                        <td><input type="text" class="form-control" value="gpt-4" id="documentationModel"></td>
+                                        <td>Consistency tracking, character management</td>
+                                        <td><button class="btn btn-sm btn-outline-primary">Change</button></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4" id="knowledge">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Knowledge Base</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Add Knowledge Entry:</h6>
+                                <div class="mb-3">
+                                    <input type="text" class="form-control" placeholder="Entry Title" id="knowledgeTitle">
+                                </div>
+                                <div class="mb-3">
+                                    <select class="form-select mb-2" id="knowledgeType">
+                                        <option value="example">Example Story</option>
+                                        <option value="technique">Writing Technique</option>
+                                        <option value="background">Background Info</option>
+                                        <option value="template">Template/Structure</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <textarea class="form-control" placeholder="Knowledge Content" id="knowledgeContent" rows="3"></textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <input type="text" class="form-control" placeholder="Tags (comma-separated)" id="knowledgeTags">
+                                </div>
+                                <button class="btn btn-primary" id="addKnowledge">Add to Knowledge Base</button>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Search Knowledge:</h6>
+                                <div class="input-group mb-3">
+                                    <input type="text" class="form-control" placeholder="Search knowledge base" id="knowledgeSearch">
+                                    <button class="btn btn-outline-secondary" type="button" id="searchBtn">Search</button>
+                                </div>
+                                <div class="list-group" id="searchResults">
+                                    <!-- Search results will appear here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/main.js"></script>
+</body>
+</html>

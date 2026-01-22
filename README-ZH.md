@@ -1,78 +1,113 @@
 # AgentPress - 多智能体 AI 编辑社
 
 [![Python](https://img.shields.io/badge/Python-3.9%2B-blue)](https://www.python.org/)
-[![AutoGen](https://img.shields.io/badge/AutoGen-AgentChat-orange)](https://microsoft.github.io/autogen/)
+[![AutoGen](https://img.sh.io/badge/AutoGen-AgentChat-orange)](https://microsoft.github.io/autogen/)
 
-**AgentPress** 是一个通用的多智能体 AI 编辑社框架。通过多个专业 AI 角色的协作，系统能够进行高质量的内容创作、校验和优化。虽然示例使用《山海经》作为背景，但通过修改提示词，可以轻松适配任何创作场景。
+**AgentPress** 是一个精简的多智能体AI发布框架，专为创作高质量故事而设计。它利用专门的AI代理通过详细提示协作来研究、写作、编辑和事实核查内容。该系统专门针对《山海经》故事进行优化，但可以适配至任何叙事体裁。
 
 ## 🌟 核心特性
 
-- **模块化多智能体架构**：4 个专业角色分工协作
-  - 📚 **研究员**：提供准确的背景研究和考据
-  - ✍️ **作家**：创作高质量内容
-  - 🔍 **事实校验员**：确保内容准确性
-  - 📝 **编辑**：提升文学和表达质量
-- **结构化通信**：Agent 间通过 JSON 格式进行精准交流
-- **多轮迭代优化**：自动进行多轮修订直至达到质量标准
-- **提示词驱动**：所有角色行为通过提示词定义，易于定制
-- **国产模型友好**：完美兼容通义千问等 OpenAI 兼容模型
+- **模块化代理架构**：在不同角色中分配专门AI代理：
+  - 📚 **神话学家**：负责背景研究和神话研究
+  - ✍️ **作家**：创作故事内容
+  - 🔍 **事实检查员**：确保故事情节一致性和逻辑准确性
+  - 💬 **对话专家**：优化对话质量和角色声音
+  - 📝 **编辑**：审查整体故事质量
+  - 📋 **档案员**：维护章节间的故事情节一致性
+- **多章节支持**：完整的单章和多章节故事创作流程，包含一致性跟踪
+- **迭代审查**：多轮审查和修订直至故事达到质量标准
+- **提示词驱动**：所有代理行为由详细提示词定义，便于定制
+- **国产量LLM友好**：兼容通义千问和其他OpenAI兼容模型
+- **一致性核查**：自动章节间一致性验证和更新
 
 ## 🚀 快速开始
 
 ### 1. 克隆项目
+```bash
 git clone https://github.com/Ddhjx-code/AgentPress.git
 cd AgentPress
+```
 
 ### 2. 安装依赖
+```bash
+pip install -r requirements.txt
+# 或手动安装：
 pip install "autogen-agentchat>=0.7.5" "autogen-ext[openai]>=0.7.5" python-dotenv
+```
 
 ### 3. 配置 API 密钥
 创建 `.env` 文件：
+```
 QWEN_API_KEY=你的API密钥
+```
 
 ### 4. 运行示例
+```bash
 python main.py
+```
 
-### 5. 查看输出
-- `final_output.json` - 完整的结构化输出
-- `final_story.md` - 格式化的 Markdown 内容
+### 5. 在 output/ 目录中查看输出
+- `output/novel_story_*.txt` - 最终故事内容
+- `output/novel_data_*.json` - 完整结构化数据
+- `output/conversation_history_*.json` - 完整对话记录
 
 ## 📁 项目结构
 
 AgentPress/
-├── main.py                  # 主程序入口
-├── prompts/                 # 角色提示词目录
-│   ├── researcher.md        # 研究员提示词
-│   ├── writer.md           # 作家提示词
-│   ├── fact_checker.md     # 事实校验员提示词
-│   └── editor.md           # 编辑提示词
-├── final_output.json        # 最终 JSON 输出
-├── final_story.md          # 最终 Markdown 输出
-└── .env                    # API 密钥配置
+├── main.py                          # 入口点，支持异步处理
+├── phases.py                        # 工作流程协调器
+├── src/                             # 核心模块目录
+│   ├── novel_phases_manager.py      # 完整多阶段写作实现
+│   └── documentation_manager.py     # 故事一致性管理
+├── agents_manager.py                # AI代理管理器
+├── conversation_manager.py          # 通信和历史管理器
+├── config.py                        # 配置和设置
+├── utils.py                         # 工具函数
+├── prompts/                         # 详细代理提示词
+│   ├── mythologist.md              # 背景研究员系统提示词
+│   ├── writer.md                   # 故事作家系统提示词
+│   ├── fact_checker.md             # 事实检查员系统提示词
+│   ├── dialogue_specialist.md      # 对话审查员系统提示词
+│   └── editor.md                   # 最终编辑系统提示词
+├── output/                         # 生成内容目录
+│   ├── novel_story_*.txt           # 故事文本文件
+│   ├── novel_data_*.json           # 完整结构化输出
+│   └── conversation_history_*.json # 通信日志
+└── .env                            # API配置
 
 ## 🎯 使用场景
 
-- **内容创作**：AI 辅助写作、博客、故事创作
-- **学术写作**：论文草稿、研究报告
-- **教育应用**：教学材料生成、学习辅助
-- **多智能体研究**：AI Agent 协作模式探索
-- **提示词工程**：高质量提示词设计和测试
+- **神话类小说**：《山海经》式故事创作
+- **小说写作**：保持情节一致性的多章节小说创作
+- **内容创作**：AI辅助小说写作
+- **多智能体协作**：AI代理协调研究
+- **提示词工程**：高质量提示词实验
 
 ## 🔄 自定义提示词
 
-要适配不同场景，只需修改 `prompts/` 目录下的提示词文件：
+为适配不同体裁，请修改 `prompts/` 目录中的提示词文件：
 
-- **更换主题**：修改 researcher.md 中的研究领域
-- **调整风格**：修改 writer.md 中的写作风格要求  
-- **改变标准**：修改 fact_checker.md 和 editor.md 中的校验标准
+- **更改设定**：修改 mythologist.md 中的神话背景设定
+- **调整风格**：更新 writer.md 中的叙事要求
+- **变更体裁**：在所有提示词中更改故事类型和风格
+
+## 📚 架构
+
+该系统使用干净的模块化架构，清晰分离关注点：
+- **协调层**：`main.py` 和 `phases.py`
+- **业务逻辑**：`src/novel_phases_manager.py`
+- **数据管理**：`src/documentation_manager.py` 和 `conversation_manager.py`
+- **AI代理**：`agents_manager.py` 和 `prompts/`
+
+这种结构允许对组件进行独立的开发和测试。
 
 ## 🤝 贡献指南
 
-欢迎提交 Issue 和 Pull Request！特别欢迎：
-- 新的提示词模板
-- 更多使用场景示例
-- 新的 Agent 角色设计
-- 性能和稳定性改进
+欢迎提交 Issue 和 Pull Request！特此欢迎：
+- 新的代理提示词设计
+- 体裁相关的配置
+- 多章节一致性改进
+- 性能和可靠性提高
 
 ## 📜 许可证
 
