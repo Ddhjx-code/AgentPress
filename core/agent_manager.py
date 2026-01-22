@@ -6,13 +6,74 @@ from config import AGENT_CONFIGS
 import asyncio
 
 
-class AgentManager:
-    """Enhanced agent manager for dynamic model selection and multi-agent coordination"""
+class ModelConfig:
+    """Configuration for different AI models per agent type"""
 
-    def __init__(self, model_client: OpenAIChatCompletionClient):
-        self.model_client = model_client
-        self.agents: Dict[str, AssistantAgent] = {}
-        self._initialized = False
+    def __init__(self):
+        self.model_configs = {
+            "writer": self._get_writer_config(),
+            "editor": self._get_editor_config(),
+            "fact_checker": self._get_fact_checker_config(),
+            "dialogue_specialist": self._get_dialogue_specialist_config(),
+            "mythologist": self._get_researcher_config(),
+            "documentation_specialist": self._get_documentation_config()
+        }
+
+    def _get_writer_config(self):
+        # Strong generative model
+        return {
+            "model": os.getenv("WRITER_MODEL", "gpt-4"),
+            "description": "Primary story content creation",
+            "capabilities": ["creative_generation", "narrative_control"]
+        }
+
+    def _get_editor_config(self):
+        # Assessment model
+        return {
+            "model": os.getenv("EDITOR_MODEL", "gpt-4"),
+            "description": "Overall story evaluation",
+            "capabilities": ["quality_assessment", "holistic_review"]
+        }
+
+    def _get_fact_checker_config(self):
+        # Logic reasoning model
+        return {
+            "model": os.getenv("FACT_CHECKER_MODEL", "gpt-4"),
+            "description": "Logic and consistency verification",
+            "capabilities": ["logical_inference", "consistency_check"]
+        }
+
+    def _get_dialogue_specialist_config(self):
+        # Language understanding focused model
+        return {
+            "model": os.getenv("DIALOGUE_MODEL", "gpt-4"),
+            "description": "Dialogue evaluation and optimization",
+            "capabilities": ["dialogue_analysis", "character_voice"]
+        }
+
+    def _get_researcher_config(self):
+        # Knowledge retrieval model (can be generic)
+        return {
+            "model": os.getenv("RESEARCHER_MODEL", "gpt-4"),
+            "description": "Background research and setting development",
+            "capabilities": ["research_synthesis", "background_development"]
+        }
+
+    def _get_documentation_config(self):
+        # Memory tracking model (long context)
+        return {
+            "model": os.getenv("DOCUMENTATION_MODEL", "gpt-4"),
+            "description": "Maintain consistency across long-form content",
+            "capabilities": ["memory_retention", "consistency_tracking"]
+        }
+
+
+class AgentManager:
+    """Updated Agent Manager with model-specific allocation"""
+
+    def __init__(self, model_configs: Optional[ModelConfig] = None):
+        self.model_configs = model_configs or ModelConfig()
+        self.agents = {}
 
     async def initialize(self, prompts: Dict[str, str]) -> bool:
         """Initialize all agents with error handling and comprehensive setup"""
