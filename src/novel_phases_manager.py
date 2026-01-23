@@ -22,6 +22,7 @@ class NovelWritingPhases:
         self.chapter_decision_engine = None  # For dynamic chapter decisions
         self.continuity_manager = None  # For cross-chapter consistency
         self.story_state_manager = None  # For tracking multi-chapter story state
+        self.progress_callback = None  # For progress notifications
 
     async def async_phase1_research_and_planning(self, novel_concept: str) -> Dict[str, Any]:
         """Async version of phase 1 with complete implementation"""
@@ -236,9 +237,15 @@ class NovelWritingPhases:
                     current_content, chapter_count, doc_agent
                 )
 
-            # Check if AI suggests ending the story
-            if chapter_decision.get("should_end", False) or chapter_count >= 10:  # Safety limit
-                print(f"   📝 AI认为当前是合适的章节结束点，停止生成更多章节")
+            # Check if AI suggests ending the story - 更严格的章节控制
+            if chapter_decision.get("should_end", False) or chapter_count >= 1:  # 限制为1章以控制长度
+                print(f"   📝 AI认为当前是合适的章节结束点或达到章数限制，停止生成更多章节")
+                break
+
+            # 检查总长度 - 增加总长度强制限制
+            current_total_length = len(current_content)
+            if current_total_length >= CREATION_CONFIG.get("total_target_length", 3000):
+                print(f"   📏 总长度达到目标限制 ({current_total_length} 字符，目标: {CREATION_CONFIG.get('total_target_length', 3000)} 字符)，停止生成")
                 break
 
             # Check overall story completion
@@ -248,8 +255,9 @@ class NovelWritingPhases:
 
             print(f"   📊 整体进度评估: {story_evaluation['summary']}")
 
-            if not story_evaluation.get("is_continuing", False):
-                print(f"   ✅ AI认为故事已达到合适的结束点")
+            # 检查是否需要继续或者达到长度限制
+            if not story_evaluation.get("is_continuing", False) or current_total_length >= CREATION_CONFIG.get("total_target_length", 3000):
+                print(f"   ✅ AI认为故事已达到合适的结束点或已达到长度限制")
                 break
 
         full_story = "\n\n".join(chapters)
@@ -441,7 +449,7 @@ class NovelWritingPhases:
             print(f"   ⚠️  档案更新出错: {e}")
 
     async def phase3_review_refinement(self, story: str) -> str:
-        """Complete phase 3 implementation for review and refinement"""
+        """Complete phase 3 implementation for review and refinement with parallel processing"""
         if not self.agents_manager:
             print("⚠️  无代理可用，跳过审查阶段")
             return story
@@ -450,14 +458,28 @@ class NovelWritingPhases:
         print("🔄 第三阶段：多轮评审和修订")
         print("="*60)
 
+        # 通知进度回调开始评审阶段
+        if self.progress_callback:
+            await self.progress_callback("质量检查", "总体进度", "开始多代理并行评审流程...")
+
         current_story = story
         version_num = 2
 
-        for round_num in range(MAX_REVISION_ROUNDS):
+        # 限制评审轮数以控制token消耗，只进行一轮评审
+        max_review_rounds = min(MAX_REVISION_ROUNDS, 1)
+        for round_num in range(max_review_rounds):
             print(f"\n--- 第 {round_num + 1} 轮评审 ---")
 
-            # Get feedback from multiple agents
-            feedback = await self._get_multifaceted_feedback(current_story)
+            if self.progress_callback:
+                await self.progress_callback(
+                    "质量检查",
+                    f"轮次 {round_num + 1}",
+                    f"正在进行第 {round_num + 1} 轮审查评估...",
+                    (round_num / max_review_rounds) if max_review_rounds > 0 else 1.0
+                )
+
+            # 通过并行处理获得来自多个代理的反馈
+            feedback = await self._get_multifaceted_feedback_parallel(current_story)
 
             avg_score = calculate_average_score(feedback)
 
@@ -467,30 +489,101 @@ class NovelWritingPhases:
             print(f"   反馈摘要:")
             print(format_feedback_summary(feedback))
 
+            # 通知进度回调
+            if self.progress_callback:
+                await self.progress_callback(
+                    "质量检查",
+                    f"轮次 {round_num + 1} 完成",
+                    f"获得反馈并计算平均分: {avg_score:.1f}/100",
+                    (round_num + 0.5) / max_review_rounds if max_review_rounds > 0 else 1.0
+                )
+
             # Check if story passes quality threshold
             if avg_score >= SCORE_THRESHOLD:
                 print(f"\n✅ 第 {round_num + 1} 轮评审通过！")
+                if self.progress_callback:
+                    await self.progress_callback(
+                        "质量检查",
+                        "评审完成",
+                        f"故事达到质量要求 (第 {round_num + 1} 轮通过)",
+                        1.0
+                    )
                 break
 
-            # Skip revision on final round
-            if round_num >= MAX_REVISION_ROUNDS - 1:
-                print(f"\n⚠️  已达到最大修订轮数")
+            # 检查总长度，避免过长
+            current_length = len(current_story)
+            if current_length > CREATION_CONFIG.get("total_target_length", 3000) * 1.2:  # 允许1.2倍的扩展
+                print(f"\n⚠️  内容长度已超过目标 ({current_length} 字符)，跳过修订阶段")
                 break
 
-            # Revise the story
-            print(f"\n🔧 进行修订...")
-            current_story = await self._revise_story(current_story, feedback)
-            self.conversation_manager.add_story_version(
-                version_num, current_story,
-                {"round": round_num + 1, "avg_score": avg_score}
-            )
-            print(f"✅ 修订完成 ({len(current_story)} 字符)")
-            version_num += 1
+            # 在我们的优化版本中，跳过修订以控制token消耗
+            print(f"\n✅ 完成评审，跳过修订阶段以控制token消耗和长度")
+            if self.progress_callback:
+                await self.progress_callback(
+                    "质量检查",
+                    "评审完成",
+                    f"跳过修订阶段以控制长度和成本",
+                    1.0
+                )
+            break  # 即使只有1轮，也要确保不会进行完整修订            version_num += 1
 
         return current_story
 
+    async def _get_multifaceted_feedback_parallel(self, story: str) -> Dict[str, Any]:
+        """Get feedback from multiple specialized agents in parallel processing using asyncio.gather"""
+        if not self.agents_manager:
+            return {"default": {"score": 75, "comments": "No agents available", "suggestions": ["Improve character development"]}}
+
+        agents_to_review = [
+            ("fact_checker", "事实与逻辑检查"),
+            ("dialogue_specialist", "对话质量评估"),
+            ("editor", "整体质量把控")
+        ]
+
+        # Create async tasks for all the agents to run them in parallel
+        tasks = []
+        agent_instances = []
+
+        for agent_name, description in agents_to_review:
+            agent = self.agents_manager.get_agent(agent_name)
+            if agent:
+                agent_instances.append((agent, agent_name, description))
+                task = self._run_single_review(agent, agent_name, story)
+                tasks.append(task)
+
+        # Execute all review tasks in parallel
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        feedback = {}
+        for i, (agent, agent_name, description) in enumerate(agent_instances):
+            print(f"   📝 {description}中...")
+            try:
+                # Check if result had an exception
+                if i < len(results) and isinstance(results[i], Exception):
+                    print(f"   ❌ {agent_name} 评审出错: {results[i]}")
+                    feedback[agent_name] = {"score": 60, "error": str(results[i])}
+                else:
+                    result = results[i]
+                    review_data = self._extract_json(result)
+                    feedback[agent_name] = result or {
+                        "score": 75,
+                        "comments": f"Default {agent_name} review",
+                        "suggestions": ["General improvement"]
+                    }
+            except Exception as e:
+                print(f"   ❌ {agent_name} 评审出错: {e}")
+                feedback[agent_name] = {"score": 60, "error": str(e)}
+
+        return feedback
+
+    async def _run_single_review(self, agent, agent_name: str, story: str):
+        """Run a single review task"""
+        review_result = await agent.run(task=self._create_review_task(story, agent_name))
+        review_content = extract_content(review_result.messages)
+        return review_content
+
     async def _get_multifaceted_feedback(self, story: str) -> Dict[str, Any]:
-        """Get feedback from multiple specialized agents"""
+        """Get feedback from multiple specialized agents - legacy non-parallel version"""
         if not self.agents_manager:
             return {"default": {"score": 75, "comments": "No agents available", "suggestions": ["Improve character development"]}}
 

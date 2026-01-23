@@ -230,7 +230,7 @@ class ChapterDecisionEngine:
                 "summary": f"已完成{len(current_chapters)}章，共计{total_chars}字"
             }
 
-        editor = self.agents_manager.get_agent("editor")
+        editor = self.agent_manager.get_agent("editor")
         if not editor:
             return {
                 "story_progress_ratio": len(current_chapters) / 3,

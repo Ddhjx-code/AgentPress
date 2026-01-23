@@ -60,9 +60,9 @@ async def initialize_workflow(
     初始化工作流服务
     """
     if not base_url:
-        base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        base_url = "https://api.qnaigc.com/v1"
     if not model_name:
-        model_name = "qwen-max"
+        model_name = "qwen3-max"
 
     try:
         await workflow_service.initialize_models(
@@ -230,9 +230,9 @@ async def get_conversation_history():
 async def get_model_configurations():
     """获取模型配置（暂时返回默认值）"""
     return {"model_configs": {
-        "writer": {"model": "qwen-max", "description": "故事创作模型"},
-        "editor": {"model": "qwen-max", "description": "编辑评价模型"},
-        "fact_checker": {"model": "qwen-max", "description": "事实检查模型"}
+        "writer": {"model": "qwen3-max", "description": "故事创作模型"},
+        "editor": {"model": "qwen3-max", "description": "编辑评价模型"},
+        "fact_checker": {"model": "qwen3-max", "description": "事实检查模型"}
     }}
 
 @app.get("/api/knowledge/search")

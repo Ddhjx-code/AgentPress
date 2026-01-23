@@ -50,9 +50,9 @@ GROUPCHAT_CONFIGS = {
 
 # 创作配置
 CREATION_CONFIG = {
-    "num_chapters": 3,         # 总章数
-    "target_length_per_chapter": 3000,  # 每章目标字数
-    "total_target_length": 9000  # 总目标字数
+    "num_chapters": 1,         # 总章数（减少为1章以控制长度）
+    "target_length_per_chapter": 2500,  # 每章目标字数（减少以控制token）
+    "total_target_length": 3000  # 总目标字数
 }
 
 # 评分阈值
@@ -62,7 +62,7 @@ MAX_REVISION_ROUNDS = 3
 # 模型配置
 MODEL_CONFIG = {
     "model": "qwen3-max",
-    "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "base_url": "https://api.qnaigc.com/v1",
     "vision": False,
     "function_calling": True,
     "json_output": True

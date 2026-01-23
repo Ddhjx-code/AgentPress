@@ -12,9 +12,6 @@ from autogen_core.models import ModelInfo, ModelFamily
 
 from .agent_manager import AgentManager
 from .conversation_manager import ConversationManager
-from src.novel_phases_manager import NovelWritingPhases
-from src.documentation_manager import DocumentationManager
-from phases import NovelWorkflowOrchestrator
 from utils import load_all_prompts
 
 
@@ -33,7 +30,7 @@ class WorkflowService:
         self.conversation_manager = None
         self.prompts = {}
 
-    async def initialize_models(self, api_key: str, base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1", model_name: str = "qwen-max"):
+    async def initialize_models(self, api_key: str, base_url: str = "https://api.qnaigc.com/v1", model_name: str = "qwen3-max"):
         """初始化模型"""
         # 创建AI模型客户端
         self.model_client = OpenAIChatCompletionClient(
@@ -61,7 +58,8 @@ class WorkflowService:
         if not agent_init_success:
             raise Exception("代理初始化失败")
 
-        # 初始化编排器
+        # 初始化编排器（使用局部导入避免循环依赖）
+        from phases import NovelWorkflowOrchestrator
         self.orchestrator = NovelWorkflowOrchestrator()
 
         return True
@@ -82,7 +80,8 @@ class WorkflowService:
                 initial_idea=novel_concept,
                 multi_chapter=True,  # 对于AI驱动动态章节，我们始终使用多章节模式
                 total_chapters=total_chapters,  # 仍保留用于向后兼容
-                agents_manager=self.agent_manager
+                agents_manager=self.agent_manager,
+                progress_callback=self._on_progress_update  # 添加进度回调
             )
 
             return {
@@ -94,6 +93,15 @@ class WorkflowService:
                 "status": "error",
                 "message": str(e)
             }
+
+    async def _on_progress_update(self, phase: str, step: str, message: str, progress: float = None):
+        """
+        进度更新回调函数
+        """
+        # 可以用于实时反馈或记录进度
+        print(f"[PROGRESS] {phase} - {step}: {message}")
+        if progress:
+            print(f"[PROGRESS] 进度: {progress*100:.1f}%")
 
     def get_conversation_history(self):
         """获取对话历史"""

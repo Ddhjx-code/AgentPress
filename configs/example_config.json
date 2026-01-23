@@ -1,7 +1,7 @@
 {
   "model_config": {
-    "model": "qwen-max",
-    "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "model": "qwen3-max",
+    "base_url": "https://api.qnaigc.com/v1",
     "vision": false,
     "function_calling": true,
     "json_output": true

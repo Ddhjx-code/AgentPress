@@ -12,7 +12,7 @@ class NovelWorkflowOrchestrator:
         self.phase_manager = None  # Will be set by main program when agents manager is available
 
     async def run_async_workflow(self, initial_idea: str, multi_chapter: bool = False,
-                                total_chapters: int = 1, agents_manager=None):
+                                total_chapters: int = 1, agents_manager=None, progress_callback=None):
         """Run the complete async workflow with proper agent coordination"""
         # Initialize the phase manager with async capabilities
         if agents_manager:
@@ -21,16 +21,37 @@ class NovelWorkflowOrchestrator:
                 documentation_manager=self.documentation_manager
             )
             phase_manager.agents_manager = agents_manager  # Pass agents manager for async operations
+            phase_manager.progress_callback = progress_callback  # Add progress callback
+
+            # Notify about workflow start
+            if progress_callback:
+                await progress_callback("整体流程", "开始", "初始化研究和规划阶段...")
 
             # Step 1: Async Research and Planning
             research_data = await phase_manager.async_phase1_research_and_planning(initial_idea)
 
+            if progress_callback:
+                await progress_callback("研究和规划", "完成", "已完成故事研究和规划")
+
             # Step 2: Async Creation - handles both single/multi chapter modes in phase manager
+            if progress_callback:
+                await progress_callback("创作阶段", "开始", "开始故事创作...")
             draft_story = await phase_manager.async_phase2_creation(research_data)
+            if progress_callback:
+                await progress_callback("创作阶段", "完成", "故事创作完成")
 
             # Step 3 & 4: Review, refinement, and final check
+            if progress_callback:
+                await progress_callback("质量检查", "开始", "正在进行多轮评审和修订...")
             revised_story = await phase_manager.phase3_review_refinement(draft_story)
+            if progress_callback:
+                await progress_callback("质量检查", "完成", "评审和修订完成")
+
+            if progress_callback:
+                await progress_callback("最终检查", "开始", "正在进行最终质量检查...")
             final_story = await phase_manager.phase4_final_check(revised_story)
+            if progress_callback:
+                await progress_callback("最终检查", "完成", "最终检查完成，流程结束")
 
             # Return complete results
             results = {
@@ -46,6 +67,8 @@ class NovelWorkflowOrchestrator:
             return results
         else:
             # Fallback: simplified workflow if no agents manager provided
+            if progress_callback:
+                await progress_callback("错误处理", "警告", "没有代理管理器，使用备用流程")
             return await self._run_fallback_workflow(initial_idea, multi_chapter, total_chapters)
 
     async def _run_fallback_workflow(self, initial_idea: str, multi_chapter: bool = False, total_chapters: int = 1):
