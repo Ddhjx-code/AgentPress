@@ -1,22 +1,22 @@
 <!-- ui/templates/index.html -->
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AgentPress Enhanced - AI Story Generator</title>
+    <title>AgentPress 增强版 - AI 故事生成器</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container">
-            <a class="navbar-brand" href="/">AgentPress Enhanced</a>
+            <a class="navbar-brand" href="/">AgentPress 增强版</a>
             <div class="navbar-nav">
-                <a class="nav-link" href="#workflow">Workflow</a>
-                <a class="nav-link" href="#agents">Agents</a>
-                <a class="nav-link" href="#knowledge">Knowledge</a>
-                <a class="nav-link" href="#settings">Settings</a>
+                <a class="nav-link" href="#workflow">工作流程</a>
+                <a class="nav-link" href="#agents">AI 代理</a>
+                <a class="nav-link" href="#knowledge">知识库</a>
+                <a class="nav-link" href="#settings">设置</a>
             </div>
         </div>
     </nav>
@@ -24,8 +24,8 @@
     <div class="container mt-4">
         <div class="row">
             <div class="col-12">
-                <h1>AgentPress Enhanced</h1>
-                <p class="lead">AI-Powered Story Generation Platform with Knowledge Base and Model Flexibility</p>
+                <h1>AgentPress 增强版</h1>
+                <p class="lead">基于知识库和模型灵活性的AI驱动故事生成平台</p>
             </div>
         </div>
 
@@ -33,31 +33,62 @@
             <div class="col-md-8">
                 <div class="card">
                     <div class="card-header">
-                        <h5>Story Creation Workflow</h5>
+                        <h5>故事创作工作流程</h5>
                     </div>
                     <div class="card-body">
                         <div class="mb-3">
-                            <label for="storyIdea" class="form-label">Enter your story idea (1-2萬字):</label>
-                            <textarea class="form-control" id="storyIdea" rows="3" placeholder="Describe your story idea..."></textarea>
+                            <label for="storyIdea" class="form-label">输入您的故事创意 (1-2万字):</label>
+                            <textarea class="form-control" id="storyIdea" rows="3" placeholder="描述您的故事创意..."></textarea>
                         </div>
                         <div class="mb-3">
-                            <label for="storyTheme" class="form-label">Story Theme:</label>
+                            <label for="storyTheme" class="form-label">故事主题:</label>
                             <select class="form-select" id="storyTheme">
-                                <option value="mythological">Mythological (not just Shanhai Jing)</option>
-                                <option value="fantasy">Fantasy</option>
-                                <option value="science_fiction">Science Fiction</option>
-                                <option value="realistic_fiction">Realistic Fiction</option>
-                                <option value="historical">Historical</option>
-                                <option value="contemporary">Contemporary</option>
-                                <option value="custom">Custom</option>
+                                <option value="mythological">神话传说 (不仅限于山海经)</option>
+                                <option value="fantasy">奇幻</option>
+                                <option value="science_fiction">科幻</option>
+                                <option value="realistic_fiction">现实主义小说</option>
+                                <option value="historical">历史</option>
+                                <option value="contemporary">当代</option>
+                                <option value="custom">自定义</option>
                             </select>
                         </div>
-                        <button id="startCreation" class="btn btn-primary">Start Story Creation</button>
+                        <button id="startCreation" class="btn btn-primary">开始故事创作</button>
                         <div id="creationProgress" class="mt-3" style="display: none;">
                             <div class="progress">
                                 <div class="progress-bar" role="progressbar" style="width: 25%" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100">25%</div>
                             </div>
-                            <p>Processing...</p>
+                            <p>处理中...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 新增：实时状态更新 -->
+                <div class="card mt-3" id="realtimeUpdates" style="display: none;">
+                    <div class="card-header">
+                        <h5>实时创作状态</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="wsStatus" class="mb-2">
+                            <span>连接状态: </span>
+                            <span id="connectionStatus" class="badge bg-secondary">准备连接</span>
+                        </div>
+                        <div id="currentStatus" class="alert alert-info">
+                            等待开始...
+                        </div>
+                        <div id="chapterUpdates" class="mt-3">
+                            <!-- 章节更新将显示在这里 -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 新增：章节内容展示 -->
+                <div class="card mt-3" id="chapterContents" style="display: none;">
+                    <div class="card-header">
+                        <h5>章节内容</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="chaptersContainer">
+                            <!-- 章节内容将动态加载 -->
                         </div>
                     </div>
                 </div>
@@ -66,13 +97,13 @@
             <div class="col-md-4">
                 <div class="card">
                     <div class="card-header">
-                        <h5>Quick Info</h5>
+                        <h5>快速信息</h5>
                     </div>
                     <div class="card-body">
-                        <p><strong>Target Length:</strong> 1-2萬字</p>
-                        <p><strong>Supported Genres:</strong> All genres supported</p>
-                        <p><strong>AI Agents:</strong> Multi-role collaboration</p>
-                        <p><strong>Knowledge Base:</strong> Dynamic content enhancement</p>
+                        <p><strong>目标长度:</strong> 1-2万字</p>
+                        <p><strong>支持题材:</strong> 支持所有题材</p>
+                        <p><strong>AI 代理:</strong> 多角色协作</p>
+                        <p><strong>知识库:</strong> 动态内容增强</p>
                     </div>
                 </div>
             </div>
@@ -82,59 +113,139 @@
             <div class="col-12">
                 <div class="card">
                     <div class="card-header">
-                        <h5>AI Agent Management</h5>
+                        <h5>AI 代理管理</h5>
                     </div>
                     <div class="card-body">
-                        <h6>Select Models for Each Agent:</h6>
+                        <h6>1. 为每个代理选择模型:</h6>
                         <div class="table-responsive">
                             <table class="table" id="agentModelTable">
                                 <thead>
                                     <tr>
-                                        <th>Agent Role</th>
-                                        <th>Current Model</th>
-                                        <th>Capabilities</th>
-                                        <th>Action</th>
+                                        <th>代理角色</th>
+                                        <th>当前模型</th>
+                                        <th>能力</th>
+                                        <th>操作</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <tr>
-                                        <td>Writer</td>
-                                        <td><input type="text" class="form-control" value="gpt-4" id="writerModel"></td>
-                                        <td>Creative generation, narrative structure</td>
-                                        <td><button class="btn btn-sm btn-outline-primary">Change</button></td>
+                                        <td>作家</td>
+                                        <td>
+                                            <select class="form-select" id="writerModel">
+                                                <option value="qwen3-max" selected>qwen3-max</option>
+                                                <option value="qwen3-plus">qwen3-plus</option>
+                                                <option value="qwen2.5-72b-instruct">qwen2.5-72b-instruct</option>
+                                                <option value="glm-4-plus">glm-4-plus</option>
+                                                <option value="ernie-4.5-8k">ernie-4.5-8k</option>
+                                            </select>
+                                        </td>
+                                        <td>创意生成，叙事结构</td>
+                                        <td><button class="btn btn-sm btn-outline-primary">更改</button></td>
                                     </tr>
                                     <tr>
-                                        <td>Mythologist/Researcher</td>
-                                        <td><input type="text" class="form-control" value="gpt-4" id="researcherModel"></td>
-                                        <td>Background research, setting development</td>
-                                        <td><button class="btn btn-sm btn-outline-primary">Change</button></td>
+                                        <td>神话学家/研究者</td>
+                                        <td>
+                                            <select class="form-select" id="researcherModel">
+                                                <option value="qwen3-max" selected>qwen3-max</option>
+                                                <option value="qwen3-plus">qwen3-plus</option>
+                                                <option value="qwen2.5-72b-instruct">qwen2.5-72b-instruct</option>
+                                                <option value="glm-4-plus">glm-4-plus</option>
+                                                <option value="ernie-4.5-8k">ernie-4.5-8k</option>
+                                            </select>
+                                        </td>
+                                        <td>背景研究，设定开发</td>
+                                        <td><button class="btn btn-sm btn-outline-primary">更改</button></td>
                                     </tr>
                                     <tr>
-                                        <td>Fact Checker</td>
-                                        <td><input type="text" class="form-control" value="gpt-4" id="factCheckerModel"></td>
-                                        <td>Logic verification, consistency check</td>
-                                        <td><button class="btn btn-sm btn-outline-primary">Change</button></td>
+                                        <td>事实检查员</td>
+                                        <td>
+                                            <select class="form-select" id="factCheckerModel">
+                                                <option value="qwen3-max" selected>qwen3-max</option>
+                                                <option value="qwen3-plus">qwen3-plus</option>
+                                                <option value="qwen2.5-72b-instruct">qwen2.5-72b-instruct</option>
+                                                <option value="glm-4-plus">glm-4-plus</option>
+                                                <option value="ernie-4.5-8k">ernie-4.5-8k</option>
+                                            </select>
+                                        </td>
+                                        <td>逻辑验证，一致性检查</td>
+                                        <td><button class="btn btn-sm btn-outline-primary">更改</button></td>
                                     </tr>
                                     <tr>
-                                        <td>Dialogue Specialist</td>
-                                        <td><input type="text" class="form-control" value="gpt-4" id="dialogueModel"></td>
-                                        <td>Dialogue quality, character voice</td>
-                                        <td><button class="btn btn-sm btn-outline-primary">Change</button></td>
+                                        <td>对话专家</td>
+                                        <td>
+                                            <select class="form-select" id="dialogueModel">
+                                                <option value="qwen3-max" selected>qwen3-max</option>
+                                                <option value="qwen3-plus">qwen3-plus</option>
+                                                <option value="qwen2.5-72b-instruct">qwen2.5-72b-instruct</option>
+                                                <option value="glm-4-plus">glm-4-plus</option>
+                                                <option value="ernie-4.5-8k">ernie-4.5-8k</option>
+                                            </select>
+                                        </td>
+                                        <td>对话质量，角色语调</td>
+                                        <td><button class="btn btn-sm btn-outline-primary">更改</button></td>
                                     </tr>
                                     <tr>
-                                        <td>Editor</td>
-                                        <td><input type="text" class="form-control" value="gpt-4" id="editorModel"></td>
-                                        <td>Quality assessment, final refinement</td>
-                                        <td><button class="btn btn-sm btn-outline-primary">Change</button></td>
+                                        <td>编辑</td>
+                                        <td>
+                                            <select class="form-select" id="editorModel">
+                                                <option value="qwen3-max" selected>qwen3-max</option>
+                                                <option value="qwen3-plus">qwen3-plus</option>
+                                                <option value="qwen2.5-72b-instruct">qwen2.5-72b-instruct</option>
+                                                <option value="glm-4-plus">glm-4-plus</option>
+                                                <option value="ernie-4.5-8k">ernie-4.5-8k</option>
+                                            </select>
+                                        </td>
+                                        <td>质量评估，最终完善</td>
+                                        <td><button class="btn btn-sm btn-outline-primary">更改</button></td>
                                     </tr>
                                     <tr>
-                                        <td>Documentation Specialist</td>
-                                        <td><input type="text" class="form-control" value="gpt-4" id="documentationModel"></td>
-                                        <td>Consistency tracking, character management</td>
-                                        <td><button class="btn btn-sm btn-outline-primary">Change</button></td>
+                                        <td>档案专家</td>
+                                        <td>
+                                            <select class="form-select" id="documentationModel">
+                                                <option value="qwen3-max" selected>qwen3-max</option>
+                                                <option value="qwen3-plus">qwen3-plus</option>
+                                                <option value="qwen2.5-72b-instruct">qwen2.5-72b-instruct</option>
+                                                <option value="glm-4-plus">glm-4-plus</option>
+                                                <option value="ernie-4.5-8k">ernie-4.5-8k</option>
+                                            </select>
+                                        </td>
+                                        <td>一致性追踪，角色管理</td>
+                                        <td><button class="btn btn-sm btn-outline-primary">更改</button></td>
                                     </tr>
                                 </tbody>
                             </table>
+                        </div>
+
+                        <h6 class="mt-4">2. 提示词管理:</h6>
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <label for="promptSelect" class="form-label">选择提示词类型:</label>
+                                <select class="form-select" id="promptSelect">
+                                    <option value="writer">作家 - 故事创作</option>
+                                    <option value="mythologist">神话学家 - 背景研究</option>
+                                    <option value="editor">编辑 - 质量把控</option>
+                                    <option value="fact_checker">事实检查员 - 逻辑核查</option>
+                                    <option value="dialogue_specialist">对话专家 - 对话优化</option>
+                                    <option value="documentation_specialist">档案专家 - 一致性管理</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="apiEndpointSelect" class="form-label">API端点配置:</label>
+                                <select class="form-select" id="apiEndpointSelect">
+                                    <option value="https://dashscope.aliyuncs.com/compatible-mode/v1" selected>阿里云通义千问</option>
+                                    <option value="https://open.bigmodel.cn/api/paas/v4/">智谱AI</option>
+                                    <option value="https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/">文心一言</option>
+                                    <option value="https://api.openai.com/v1/">OpenAI</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <label for="promptContent" class="form-label">编辑提示词内容:</label>
+                            <textarea class="form-control" id="promptContent" rows="8" placeholder="选择提示词类型来加载内容..."></textarea>
+                        </div>
+                        <div class="mt-2">
+                            <button class="btn btn-outline-secondary" id="loadPromptBtn">加载提示词</button>
+                            <button class="btn btn-outline-primary" id="savePromptBtn">保存提示词</button>
                         </div>
                     </div>
                 </div>
@@ -145,39 +256,39 @@
             <div class="col-12">
                 <div class="card">
                     <div class="card-header">
-                        <h5>Knowledge Base</h5>
+                        <h5>知识库</h5>
                     </div>
                     <div class="card-body">
                         <div class="row">
                             <div class="col-md-6">
-                                <h6>Add Knowledge Entry:</h6>
+                                <h6>添加知识条目:</h6>
                                 <div class="mb-3">
-                                    <input type="text" class="form-control" placeholder="Entry Title" id="knowledgeTitle">
+                                    <input type="text" class="form-control" placeholder="条目标题" id="knowledgeTitle">
                                 </div>
                                 <div class="mb-3">
                                     <select class="form-select mb-2" id="knowledgeType">
-                                        <option value="example">Example Story</option>
-                                        <option value="technique">Writing Technique</option>
-                                        <option value="background">Background Info</option>
-                                        <option value="template">Template/Structure</option>
+                                        <option value="example">示例故事</option>
+                                        <option value="technique">写作技巧</option>
+                                        <option value="background">背景信息</option>
+                                        <option value="template">模板/结构</option>
                                     </select>
                                 </div>
                                 <div class="mb-3">
-                                    <textarea class="form-control" placeholder="Knowledge Content" id="knowledgeContent" rows="3"></textarea>
+                                    <textarea class="form-control" placeholder="知识内容" id="knowledgeContent" rows="3"></textarea>
                                 </div>
                                 <div class="mb-3">
-                                    <input type="text" class="form-control" placeholder="Tags (comma-separated)" id="knowledgeTags">
+                                    <input type="text" class="form-control" placeholder="标签 (逗号分隔)" id="knowledgeTags">
                                 </div>
-                                <button class="btn btn-primary" id="addKnowledge">Add to Knowledge Base</button>
+                                <button class="btn btn-primary" id="addKnowledge">添加到知识库</button>
                             </div>
                             <div class="col-md-6">
-                                <h6>Search Knowledge:</h6>
+                                <h6>搜索知识:</h6>
                                 <div class="input-group mb-3">
-                                    <input type="text" class="form-control" placeholder="Search knowledge base" id="knowledgeSearch">
-                                    <button class="btn btn-outline-secondary" type="button" id="searchBtn">Search</button>
+                                    <input type="text" class="form-control" placeholder="搜索知识库" id="knowledgeSearch">
+                                    <button class="btn btn-outline-secondary" type="button" id="searchBtn">搜索</button>
                                 </div>
                                 <div class="list-group" id="searchResults">
-                                    <!-- Search results will appear here -->
+                                    <!-- 搜索结果将显示在这里 -->
                                 </div>
                             </div>
                         </div>

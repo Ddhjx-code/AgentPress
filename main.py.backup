@@ -1,0 +1,123 @@
+# main.py
+import asyncio
+import os
+from pathlib import Path
+from datetime import datetime
+from dotenv import load_dotenv
+import json
+
+from config import MODEL_CONFIG, OUTPUT_DIR, CREATION_CONFIG
+from utils import save_json, save_text
+from core.workflow_service import WorkflowService
+
+async def main():
+    """主程序"""
+    # 加载环境变量
+    load_dotenv()
+
+    print("\n" + "="*60)
+    print("🚀 网络小说AI创作系统")
+    print("="*60)
+
+    # 检查API密钥
+    api_key = os.getenv("QWEN_API_KEY")
+    if not api_key:
+        print("❌ 错误: 未设置 QWEN_API_KEY 环境变量")
+        return
+
+    # 初始化工作流服务
+    print("\n🔧 初始化工作流服务...")
+    workflow_service = WorkflowService()
+
+    try:
+        # 初始化模型
+        await workflow_service.initialize_models(
+            api_key=api_key,
+            base_url=MODEL_CONFIG["base_url"],
+            model_name=MODEL_CONFIG["model"]
+        )
+        print("✅ 工作流服务初始化完成")
+    except Exception as e:
+        print(f"❌ 工作流服务初始化失败: {e}")
+        return
+
+    # 显示创作配置 - 现在将使用AI进行动态分章
+    print(f"\n⚙️  创作配置 (AI动态决定分章):")
+    print(f"   原配置章数 (已取代): {CREATION_CONFIG['num_chapters']}")
+    print(f"   每章目标字数: {CREATION_CONFIG['target_length_per_chapter']} 字")
+    print(f"   总目标字数: {CREATION_CONFIG['total_target_length']} 字")
+    print(f"   注意: 章节数量现由AI智能决定")
+
+    # 获取默认创意输入
+    print("\n" + "="*60)
+    print("📝 使用默认创意进行创作")
+    print("="*60)
+
+    novel_concept = """
+    刑天与帝至此争神，帝断其首，葬之常羊之山。乃以乳为目，以脐为口，操干戚以舞。
+    """
+
+    print(f"\n📖 默认创意:")
+    print(f"{novel_concept}")
+
+    # 执行工作流程
+    try:
+        print("\n🔄 开始创作流程...")
+        result = await workflow_service.execute_workflow(
+            novel_concept=novel_concept,
+            multi_chapter=CREATION_CONFIG['num_chapters'] > 1,
+            total_chapters=CREATION_CONFIG['num_chapters']
+        )
+
+        if result["status"] == "success":
+            final_output = result["data"]
+
+            # 保存结果
+            print("\n" + "="*60)
+            print("💾 保存结果")
+            print("="*60)
+
+            OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+            # 保存故事文本
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            story_file = OUTPUT_DIR / f"novel_story_{timestamp}.txt"
+            save_text(final_output["final_story"], story_file)
+
+            # 保存完整数据
+            data_file = OUTPUT_DIR / f"novel_data_{timestamp}.json"
+            save_json(final_output, data_file)
+
+            # 保存对话历史
+            history_data = workflow_service.get_conversation_history()
+            history_file = OUTPUT_DIR / f"conversation_history_{timestamp}.json"
+            save_json(history_data, history_file)
+
+            # 显示摘要
+            print("\n" + "="*60)
+            print("✅ 创作完成！")
+            print("="*60)
+            print(f"\n📊 创作摘要:")
+            print(f"  • 初始想法: {final_output['initial_idea'][:50]}...")
+            print(f"  • 故事字数: {len(final_output['final_story'])} 字")
+            print(f"  • 研究计划长度: {len(final_output['research_plan'])} 字符")
+            print(f"  • 创作模式: {'分章节模式' if CREATION_CONFIG['num_chapters'] > 1 else '单章模式'}")
+
+            print(f"\n📁 输出文件:")
+            print(f"  • 故事文本: {story_file}")
+            print(f"  • 完整数据: {data_file}")
+            print(f"  • 对话历史: {history_file}")
+
+    except Exception as e:
+        print(f"\n❌ 错误: {e}")
+        import traceback
+        traceback.print_exc()
+
+    finally:
+        # 关闭模型客户端
+        if hasattr(workflow_service, 'model_client') and workflow_service.model_client:
+            await workflow_service.model_client.close()
+        print("\n👋 程序结束")
+
+if __name__ == "__main__":
+    asyncio.run(main())

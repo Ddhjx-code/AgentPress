@@ -4,6 +4,9 @@ from typing import List, Dict, Any
 from core.agent_manager import AgentManager
 from core.conversation_manager import ConversationManager
 from src.documentation_manager import DocumentationManager
+from core.chapter_decision_engine import ChapterDecisionEngine
+from core.continuity_manager import ContinuityManager
+from core.story_state_manager import StoryStateManager
 from config import GROUPCHAT_CONFIGS, CREATION_CONFIG, SCORE_THRESHOLD, MAX_REVISION_ROUNDS
 from utils import extract_content, extract_all_json, calculate_average_score, format_feedback_summary
 
@@ -16,6 +19,9 @@ class NovelWritingPhases:
         self.conversation_manager = conversation_manager
         self.documentation_manager = documentation_manager
         self.agents_manager = None  # Will be set by caller
+        self.chapter_decision_engine = None  # For dynamic chapter decisions
+        self.continuity_manager = None  # For cross-chapter consistency
+        self.story_state_manager = None  # For tracking multi-chapter story state
 
     async def async_phase1_research_and_planning(self, novel_concept: str) -> Dict[str, Any]:
         """Async version of phase 1 with complete implementation"""
@@ -97,63 +103,201 @@ class NovelWritingPhases:
         return result
 
     async def async_phase2_creation(self, research_data: Dict[str, Any]) -> str:
-        """Async phase 2: Creation with both single and multi-chapter support"""
-        num_chapters = CREATION_CONFIG.get("num_chapters", 1)
+        """Async phase 2: Creation with dynamic AI-driven chapter decisions"""
+        # Initialize the chapter decision engine, continuity manager and story state manager
+        self.chapter_decision_engine = ChapterDecisionEngine(self.agents_manager)
+        self.continuity_manager = ContinuityManager(self.agents_manager)
 
-        if num_chapters == 1:
-            # Single chapter creation
-            return await self._async_phase2_single_chapter(research_data)
-        else:
-            # Multi-chapter creation with documentation
-            return await self._async_phase2_multiple_chapters(research_data, num_chapters)
+        # Initialize story state manager and create story state
+        self.story_state_manager = StoryStateManager()
 
-    async def _async_phase2_single_chapter(self, research_data: Dict[str, Any]) -> str:
-        """Single chapter creation"""
+        # Use dynamic chapter decision instead of fixed number
+        return await self._async_phase2_dynamic_chapters(research_data)
+
+    async def _async_phase2_dynamic_chapters(self, research_data: Dict[str, Any]) -> str:
+        """Dynamic chapter creation using AI decision engine"""
         print("\n" + "="*60)
-        print("✍️  第二阶段：单章创作")
+        print("✍️  第二阶段：AI驱动的动态章节创作")
         print("="*60)
 
         if not self.agents_manager:
-            # Fallback creation
-            outline = research_data.get("outline", "创作大纲")
-            story = f"""
-基于 '{outline}' 创作的网络小说初稿。
-
-故事从这里开始，根据研究数据展开情节...
-            """
-            self.conversation_manager.add_story_version(1, story)
-            print(f"✅ 初稿完成 ({len(story)} 字符)")
-            return story
+            # Fallback implementation using single chapter
+            return await self._async_phase2_single_chapter(research_data)
 
         writer = self.agents_manager.get_agent("writer")
         if not writer:
             return "❌ 未找到writer代理"
 
-        writer_input = f"""
-根据以下研究数据创作网络小说初稿：
+        chapters = []
+        target_per_chapter = CREATION_CONFIG.get("target_length_per_chapter", 2000)
 
-{json.dumps(research_data, ensure_ascii=False, indent=2)}
+        # Generate dynamic chapter plan
+        chapter_plan = await self.chapter_decision_engine.create_chapter_outline(
+            research_data.get("outline", "创意构思")
+        )
 
-要求：
-- 初稿长度：2000-3000字
-- 风格：网络文学风格，引人入胜
-- 包含：精彩的开场、主角介绍、第一个冲突或转折
-- 直接输出故事文本（不要JSON）
-        """
+        print(f"📖 基于AI分析的动态章节规划，预期创作章节: {len(chapter_plan) if chapter_plan else '动态确定'}")
 
-        result = await writer.run(task=writer_input)
-        story = extract_content(result.messages)
+        current_content = ""
+        chapter_count = 0
 
-        self.conversation_manager.add_story_version(1, story)
-        print(f"✅ 初稿完成 ({len(story)} 字符)")
+        # Create story in state manager
+        from datetime import datetime
+        story_id = f"story_{datetime.now().timestamp()}"
+        self.story_state_manager.create_story(
+            story_id=story_id,
+            title=research_data.get('outline', 'AI生成的故事'),
+            initial_metadata={'research_data': research_data}
+        )
 
-        return story
+        while True:  # Continue until AI decides to stop
+            chapter_count += 1
+            print(f"\n--- 章节 {chapter_count} ---")
+
+            # Prepare context for next chapter
+            context = self._prepare_creation_context(
+                chapter_count, research_data, chapters, target_per_chapter, current_content
+            )
+
+            # Generate content for this iteration
+            result = await writer.run(task=context)
+            new_content = extract_content(result.messages)
+
+            # Combine with existing content
+            if current_content:
+                current_content += "\n\n" + new_content
+            else:
+                current_content = new_content
+
+            chapters.append(new_content)
+
+            print(f"   ✅ 新增内容（{len(new_content)} 字符）")
+
+            # Create chapter info dictionary
+            chapter_info = {
+                "chapter_num": chapter_count,
+                "content": new_content,
+                "word_count": len(new_content),
+                "summary": new_content[:200] + "..." if len(new_content) > 200 else new_content,
+                "title": f"第{chapter_count}章"  # Will be updated by decision engine
+            }
+
+            # Use chapter decision engine to determine if we should continue
+            chapter_decision = await self.chapter_decision_engine.should_end_chapter(
+                current_content,
+                research_data
+            )
+
+            # Update chapter title from decision
+            suggested_title = chapter_decision.get("suggested_title", f"第{chapter_count}章")
+            chapter_info["title"] = suggested_title
+
+            print(f"   🤖 AI章节分析: {chapter_decision['reasoning']} (置信度: {chapter_decision['confidence']:.2f})")
+
+            # Create chapter in story state manager
+            if self.story_state_manager:
+                chapter_state = self.story_state_manager.create_chapter(
+                    story_id=story_id,
+                    title=suggested_title,
+                    content=new_content
+                )
+                print(f"   📌 章节状态已记录: {chapter_state.chapter_id}")
+
+            # Update continuity manager with current chapter
+            if self.continuity_manager:
+                await self.continuity_manager.update_for_chapter(new_content, chapter_info)
+
+            # Check continuity for this chapter
+            if self.continuity_manager:
+                continuity_report = await self.continuity_manager.check_continuity(
+                    new_content, chapter_count
+                )
+                print(f"   🔍 连续性检查: {continuity_report['summary']}")
+
+                # If there are high-severity inconsistencies, we could consider revising
+                high_severity_issues = [issue for issue in continuity_report.get('inconsistencies', [])
+                                      if issue.get('severity') == 'high']
+                if high_severity_issues:
+                    print(f"   ⚠️  检测到 {len(high_severity_issues)} 个高严重性连续性问题")
+                    for issue in high_severity_issues:
+                        print(f"      - {issue['element']}: {issue['issue']}")
+
+            # Create chapter in conversation manager
+            self.conversation_manager.add_story_version(
+                chapter_count,
+                current_content,
+                {"chapter_num": chapter_count, "decision": chapter_decision, "continuity": continuity_report}
+            )
+
+            # Apply documentation if agent available
+            doc_agent = self.agents_manager.get_agent("documentation_specialist")
+            if doc_agent:
+                await self._update_documentation_for_chapter(
+                    current_content, chapter_count, doc_agent
+                )
+
+            # Check if AI suggests ending the story
+            if chapter_decision.get("should_end", False) or chapter_count >= 10:  # Safety limit
+                print(f"   📝 AI认为当前是合适的章节结束点，停止生成更多章节")
+                break
+
+            # Check overall story completion
+            story_evaluation = await self.chapter_decision_engine.evaluate_overall_progress(
+                chapters, research_data
+            )
+
+            print(f"   📊 整体进度评估: {story_evaluation['summary']}")
+
+            if not story_evaluation.get("is_continuing", False):
+                print(f"   ✅ AI认为故事已达到合适的结束点")
+                break
+
+        full_story = "\n\n".join(chapters)
+
+        print(f"\n🤖 AI驱动动态创作完成！共 {chapter_count} 段，{len(full_story)} 字")
+        return full_story
+
+    def _prepare_creation_context(self, chapter_num: int, research_data: Dict,
+                                previous_chapters: List[str], target_length: int, current_content: str) -> str:
+        """Prepare content creation context using current information"""
+        context = f"""
+第 {chapter_num} 部分创作要求 (动态章节)
+
+【故事研究数据】
+{json.dumps(research_data, ensure_ascii=False, indent=2)[:1000]}
+
+【整体进展】
+已创作了 {len(previous_chapters)} 个部分内容
+
+【已有内容片段（供参考连贯性）】
+"""
+        if previous_chapters:
+            context += f"...({len(previous_chapters)} 个较早的片段)\n{previous_chapters[-1][-500:]}\n\n"
+        else:
+            context += "这是开篇内容\n\n"
+
+        context += f"""
+【当前内容长度】
+当前总内容长度: {len(current_content)} 字符
+
+【本段创作要求】
+建议长度: {target_length} 字左右
+- 保持叙述连贯性
+- 引入新情节点或发展现有冲突
+- 为可能的后续章节创建悬念或自然终结点
+- 专注高质量的叙事内容
+- 直接输出内容，无需额外说明
+"""
+        return context
 
     async def _async_phase2_multiple_chapters(self, research_data: Dict[str, Any], num_chapters: int) -> str:
-        """Complete async multi-chapter creation with documentation support"""
+        """Legacy async multi-chapter creation (for compatibility) - but enhanced with some dynamic features"""
         print("\n" + "="*60)
-        print(f"✍️  第二阶段：多章节创作（{num_chapters}章）")
+        print(f"✍️  第二阶段：传统多章节创作（{num_chapters}章-已弃用，改为AI驱动）")
         print("="*60)
+
+        # 提示用户现在应该使用AI驱动的动态模式
+        print("💡 提示: 系统已升级为AI驱动的动态章节模式，将在下一个版本中启用")
 
         if not self.agents_manager:
             # Simulated multi-chapter for fallback
@@ -191,6 +335,13 @@ class NovelWritingPhases:
 
             print(f"   ✅ 完成（{len(chapter)} 字）")
 
+            # If we have the chapter decision engine available, try to use its insights
+            if self.chapter_decision_engine:
+                chapter_decision = await self.chapter_decision_engine.should_end_chapter(
+                    chapter, research_data
+                )
+                print(f"   🤖 AI章节分析: {chapter_decision['reasoning']}")
+
             # Apply documentation and consistency checks
             if doc_agent:
                 await self._update_documentation_for_chapter(chapter, chapter_num)
@@ -221,8 +372,8 @@ class NovelWritingPhases:
 
         return full_story
 
-    async def _prepare_chapter_context(self, chapter_num: int, research_data: Dict,
-                                     previous_chapters: List[str], target_length: int) -> str:
+    def _prepare_chapter_context(self, chapter_num: int, research_data: Dict,
+                                previous_chapters: List[str], target_length: int) -> str:
         """Prepare creation context including documentation"""
         context = f"""
 第 {chapter_num} 章创作
@@ -253,15 +404,16 @@ class NovelWritingPhases:
 
         return context
 
-    async def _update_documentation_for_chapter(self, chapter: str, chapter_num: int):
+    async def _update_documentation_for_chapter(self, chapter: str, chapter_num: int, doc_agent=None):
         """Update documentation using documentation agent"""
-        doc_agent = self.agents_manager.get_agent("documentation_specialist")
+        if not doc_agent:
+            doc_agent = self.agents_manager.get_agent("documentation_specialist")
         if not doc_agent:
             return
 
         # Task for documentation specialist to extract key information
         doc_task = f"""
-请从以下第 {chapter_num} 章内容中提取关键信息并更新档案：
+请从以下内容的第 {chapter_num} 部分中提取关键信息并更新档案：
 {chapter}
 
 返回JSON格式，包含：characters, timeline, world_rules, foreshadowing 等信息。

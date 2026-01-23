@@ -29,6 +29,9 @@ class JsonFileKnowledgeStorage(BaseKnowledgeStorage):
                     data = json.load(f)
 
                 for entry_data in data.get("entries", []):
+                    # 兼容旧版本的entry_data，添加缺失的chapter_id
+                    if 'chapter_id' not in entry_data or entry_data.get('chapter_id') is None:
+                        entry_data['chapter_id'] = None
                     entry = KnowledgeEntry(**entry_data)
                     self.entries[entry.id] = entry
             except Exception as e:
@@ -51,7 +54,8 @@ class JsonFileKnowledgeStorage(BaseKnowledgeStorage):
                 "source": entry.source,
                 "creation_date": entry.creation_date,
                 "last_modified": entry.last_modified,
-                "knowledge_type": entry.knowledge_type
+                "knowledge_type": entry.knowledge_type,
+                "chapter_id": entry.chapter_id
             })
 
         data_to_save = {
@@ -120,3 +124,40 @@ class JsonFileKnowledgeStorage(BaseKnowledgeStorage):
     async def get_entries_by_type(self, knowledge_type: str) -> List[KnowledgeEntry]:
         """Get entries of a specific knowledge type"""
         return [entry for entry in self.entries.values() if entry.knowledge_type == knowledge_type]
+
+    async def get_entries_by_chapter(self, chapter_id: str) -> List[KnowledgeEntry]:
+        """Get entries associated with a specific chapter"""
+        return [entry for entry in self.entries.values()
+                if entry.chapter_id and entry.chapter_id == chapter_id]
+
+    async def get_entries_by_chapter_and_type(self, chapter_id: str, knowledge_type: str) -> List[KnowledgeEntry]:
+        """Get entries of specific type for a particular chapter"""
+        return [entry for entry in self.entries.values()
+                if entry.chapter_id == chapter_id and
+                   entry.knowledge_type == knowledge_type]
+
+    async def associate_with_chapter(self, entry_id: str, chapter_id: str) -> bool:
+        """Associate a knowledge entry with a specific chapter"""
+        if entry_id in self.entries:
+            self.entries[entry_id].chapter_id = chapter_id
+            self.entries[entry_id].last_modified = datetime.now().isoformat()
+            self._save_to_file()
+            return True
+        return False
+
+    async def remove_chapter_association(self, entry_id: str) -> bool:
+        """Remove chapter association for a knowledge entry"""
+        if entry_id in self.entries:
+            self.entries[entry_id].chapter_id = None
+            self.entries[entry_id].last_modified = datetime.now().isoformat()
+            self._save_to_file()
+            return True
+        return False
+
+    async def get_all_chapter_ids(self) -> List[str]:
+        """Get all unique chapter IDs in the knowledge storage"""
+        chapter_ids = set()
+        for entry in self.entries.values():
+            if entry.chapter_id:
+                chapter_ids.add(entry.chapter_id)
+        return list(chapter_ids)
