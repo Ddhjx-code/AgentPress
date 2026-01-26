@@ -65,6 +65,16 @@ python app.py
 - `output/novel_data_*.json` - Complete structured data
 - `output/conversation_history_*.json` - Full conversation records
 - `data/knowledge_repo/json_storage.json` - Knowledge base with extracted techniques
+- `data/knowledge_repo/enhanced/` - Partitioned-by-type knowledge storage
+
+### 7. Web API Endpoints (for PDF novel processing)
+AgentPress provides RESTful API endpoints for programmatic access to PDF processing features:
+
+- **Process single PDF**: `POST /api/process-novel-pdf` - Upload and process a single PDF novel
+- **Batch process PDFs**: `POST /api/process-novel-pdf-batch` - Process a batch of PDFs by path list
+- **Knowledge stats**: `GET /api/novel-knowledge-stats` - Get statistics about analyzed content
+- **Search techniques**: `GET /api/search-novel-techniques` - Search for specific techniques by query/tag
+- **Get examples**: `GET /api/examples-by-novel-type` - Retrieve specific types of examples
 
 ## 📁 Project Structure
 
@@ -107,7 +117,6 @@ AgentPress/
 │   └── conversation_history_*.json # Communication logs
 ├── data/knowledge_repo/            # Knowledge base storage
 │   └── json_storage.json           # JSON format knowledge base
-├── NOVEL_PDF_PROCESSING.md         # PDF processing documentation
 └── .env                            # API configuration
 
 ## 🎯 Use Cases
@@ -137,8 +146,21 @@ This system uses a clean, modular architecture with clear separation of concerns
 - **Web Services**: `apps/web_ui.py` with enhanced API endpoints
 - **Data management**: `src/documentation_manager.py` and `conversation_manager.py`
 - **AI agents**: `agents_manager.py` and `prompts/`
+- **Testing**: `tests/` directory with comprehensive unit and integration tests
 
-This structure allows for independent development and testing of components.
+This structure allows for independent development and testing of components. The system supports multilayer analysis, dividing the process into paragraph-level, chapter-level, and overall narrative-level analysis:
+- **Paragraph Analysis**: Fine-grained analysis (techniques, rhythm, character development)
+- **Chapter Summary**: Aggregated analysis of chapter characteristics
+- **Overall Structure**: Comprehensive narrative structure analysis based on chapter summaries
+
+The system also implements sophisticated knowledge storage that partitions data by type:
+- `literature.json`: Literature analysis
+- `techniques.json`: Writing techniques
+- `examples.json`: Examples
+- `character_development.json`: Character development analysis
+- `dialogue.json`: Dialogue analysis
+- `rhythm.json`: Rhythm analysis
+- `general.json`: General content
 
 ## 🤝 Contributing
 

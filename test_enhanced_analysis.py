@@ -58,7 +58,7 @@ async def test_enhanced_analysis():
 
     print(f"📖 开始分析: {pdf_path}")
 
-    # 我们将仅对少量内容进行测试以验证功能
+    # 我将仅对少量内容进行测试以验证功能
     from knowledge.pdf_processor import PDFProcessor
     from knowledge.chapter_analyzer import ChapterAnalyzer  # 如果模块存在
 
@@ -113,7 +113,6 @@ async def test_enhanced_analysis():
 def sync_main():
     """同步入口点"""
     import asyncio
-    import sys
 
     if sys.platform.startswith("win"):
         asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())

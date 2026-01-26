@@ -50,7 +50,7 @@ async def test_novel_analysis():
     # 创建一个简化版的测试
     processor = PDFProcessor()
 
-    # 只提取PDF的前几页内容
+    # 只取PDF的前几页内容
     pdf_data = processor.extract_pdf_content("安徒生童话选.pdf")
     content = pdf_data['content']
 
@@ -96,7 +96,7 @@ async def test_novel_analysis():
 
     print(f"🔍 开始分析 {len(test_segments)} 个测试段落...")
 
-    # 只分析前几个段落，而不是全部521个
+    # 只析前几个段落，而不是全部521个
     success_count = 0
     results = []
 

@@ -25,7 +25,9 @@ class LiteraryAnalyzer:
         if not workflow_service.model_client:
             raise ValueError("WorkflowService 必须已初始化模型客户端")
 
-        # 从prompts目录加载分析提示词模板
+        # 使用新的提示词格式 - JSON结构化输出
+        # 当前的 literary_analysis_base.md 文件已经是新的结构化提示词
+        # 直接使用它，不按section分割
         import os
         from pathlib import Path
 
@@ -34,36 +36,18 @@ class LiteraryAnalyzer:
         technique_prompt_path = prompts_dir / "literary_analysis_base.md"
         if technique_prompt_path.exists():
             with open(technique_prompt_path, 'r', encoding='utf-8') as f:
-                template_content = f.read()
+                full_content = f.read()
 
-            # 按照提示词块分割
-            sections = {}
-            current_section = None
-            current_content = ""
-
-            for line in template_content.split('\n'):
-                if line.startswith('## '):
-                    if current_section:
-                        sections[current_section] = current_content.strip()
-                    current_section = line[3:].strip().lower().replace(' ', '_')
-                    current_content = ""
-                else:
-                    current_content += line + "\n"
-
-            # 保存最后一个section
-            if current_section:
-                sections[current_section] = current_content.strip()
-
-            # 设置分析提示词模板
+            # 目前的新的提示词是整体一个JSON输出格式，使用它作为技巧分析的主提示词
             self.analysis_prompt_templates = {
-                "technique_analysis": sections.get("technique_analysis", "请深度分析以下文本片段的文学技巧：\n\n文本内容: {text}\n\n请从以下维度分析：修辞手法, 叙述技巧, 情感表达, 结构布局, 人物塑造。"),
-                "rhythm_analysis": sections.get("rhythm_analysis", "请从叙事技巧角度分析以下文本片段的节奏控制:\n\n文本内容: {text}"),
-                "classic_paragraph_analysis": sections.get("classic_analysis", "请判断以下段落是否具有经典文学段落的价值：\n\n文本内容: {text}"),
-                "character_development_analysis": sections.get("character_analysis", "请分析以下文本片段中的人物塑造艺术：\n\n文本内容: {text}"),
-                "dialogue_analysis": sections.get("dialogue_analysis", "请分析以下文本片段中对话的文学技巧：\n\n文本内容: {text}")
+                "technique_analysis": f"""{full_content}\n\n现在请分析以下文本片段:\n\n文本内容: {{text}}""",
+                "rhythm_analysis": f"""{full_content}\n\n现在请分析以下文本段落在节奏调控方面（C类）的使用:\n\n文本内容: {{text}}""",
+                "classic_paragraph_analysis": f"""{full_content}\n\n现在请判断以下文本段落是否有足够的文学价值，特别关注技巧使用的独特性:\n\n文本内容: {{text}}""",
+                "character_development_analysis": f"""{full_content}\n\n现在请分析以下文本片段中的人物驱动（D类）技巧使用:\n\n文本内容: {{text}}""",
+                "dialogue_analysis": f"""{full_content}\n\n现在请分析以下文本片段中的语言风格（F类）及对话技巧:\n\n文本内容: {{text}}"""
             }
         else:
-            # 如果提示词文件不存在，使用默认模板
+            # 如果提示词文件不存在，使用旧的模板
             self.analysis_prompt_templates = {
                 "technique_analysis": """请深度分析以下文本片段的文学技巧：
 
@@ -78,8 +62,7 @@ class LiteraryAnalyzer:
 6. 语言艺术特色 (如词句选择、语调节奏、风格特点等)
 
 请用中文简洁输出，每项不超过50字。""",
-
-                "rhythm_analysis": """请从叙事技巧角度分析以下文本片段的节奏控制：
+                "rhythm_analysis": """请深度分析以下文本片段的节奏调控技巧：
 
 文本内容: {text}
 
@@ -90,7 +73,6 @@ class LiteraryAnalyzer:
 4. 节奏变化技巧：欲扬先抑、先声夺人、节奏突变等手法
 
 说明：重点关注故事叙述节奏安排、情节推进技巧及情绪控制方法。""",
-
                 "classic_paragraph_analysis": """请判断以下段落是否具有经典文学段落的价值：
 
 文本内容: {text}
@@ -102,7 +84,6 @@ class LiteraryAnalyzer:
 4. 是否具有代表性或典型性的文学意义
 
 请给出明确判断并详细分析其文学价值和技巧亮点。""",
-
                 "character_development_analysis": """请分析以下文本片段中的人物塑造艺术：
 
 文本内容: {text}
@@ -115,7 +96,6 @@ class LiteraryAnalyzer:
 5. 人物象征意义或典型性
 
 如果文本中没有明显人物，请说明。""",
-
                 "dialogue_analysis": """请分析以下文本片段中对话的文学技巧：
 
 文本内容: {text}
@@ -210,60 +190,304 @@ class LiteraryAnalyzer:
         return None
 
     async def _analyze_technique(self, text: str) -> str:
-        """分析文本的文学技巧"""
+        """分析文本的文学技巧 - 现在返回JSON解析后的技巧信息"""
         if len(text.strip()) < 10:
             return ""
         prompt = self.analysis_prompt_templates["technique_analysis"].format(text=text)
         try:
+            import json
             response = await self._get_ai_response(prompt)
-            return response
-        except:
-            return ""
+
+            # 尝试解析AI返回的JSON格式数据
+            try:
+                # 尝试解析JSON响应
+                if response.strip().startswith('```json'):
+                    # 提取代码块中的JSON
+                    json_str = response.strip()
+                    if json_str.startswith('```json'):
+                        json_str = json_str[7:]  # 移除```json
+                    if json_str.endswith('```'):
+                        json_str = json_str[:-3]  # 移除末尾 ```
+                    json_str = json_str.strip()
+                    data = json.loads(json_str)
+                elif response.strip().startswith('{') and response.strip().endswith('}'):
+                    # 直接是JSON
+                    data = json.loads(response)
+                else:
+                    # 不是JSON格式，返回原始响应
+                    return response
+            except json.JSONDecodeError:
+                # 如果JSON解析失败，返回原始响应
+                return response
+
+            # 將式化JSON响应为人可读的分析内容
+            techniques_info = []
+            if "techniques" in data and data["techniques"]:
+                for tech in data["techniques"]:
+                    techniques_info.append(
+                        f"技巧: {tech.get('name', '未知技巧')}\n"
+                        f"类型: {tech.get('module', '?')} \n"
+                        f"应用情境: {tech.get('trigger_context', '')}\n"
+                        f"实现机制: {tech.get('mechanism', '')}\n"
+                        f"效果: {tech.get('effect', '')}\n"
+                        f"常见组合: {'; '.join(tech.get('common_combinations', []))}"
+                    )
+
+            formatted_result = "文学技巧分析:\n"
+            if data.get("source_excerpt"):
+                formatted_result += f"摘录: {data['source_excerpt']}\n"
+
+            if techniques_info:
+                formatted_result += "识别的技巧:\n" + "\n".join(techniques_info)
+            else:
+                formatted_result += "未检测到明显的文学技巧"
+
+            if data.get("genre_tags"):
+                formatted_result += f"\n文本类型标签: {', '.join(data['genre_tags'])}"
+
+            if data.get("intensity"):
+                formatted_result += f"\n技巧密度: {data['intensity']}"
+
+            return formatted_result
+        except Exception as e:
+            print(f"技巧分析处理错误: {str(e)}")
+            return f"分析时遇到技术问题: {str(e)}"
 
     async def _analyze_rhythm(self, text: str) -> str:
-        """分析文本的节奏"""
+        """分析文本的节奏 - 处理JSON格式响应"""
         if len(text.strip()) < 20:
             return ""
         prompt = self.analysis_prompt_templates["rhythm_analysis"].format(text=text)
         try:
+            import json
             response = await self._get_ai_response(prompt)
-            return response
-        except:
-            return ""
+
+            # 解析JSON响应
+            try:
+                if response.strip().startswith('```json'):
+                    # 提取代码块中的JSON
+                    json_str = response.strip()
+                    if json_str.startswith('```json'):
+                        json_str = json_str[7:]  # 移除```json
+                    if json_str.endswith('```'):
+                        json_str = json_str[:-3]  # 移除末尾 ```
+                    json_str = json_str.strip()
+                    data = json.loads(json_str)
+                elif response.strip().startswith('{') and response.strip().endswith('}'):
+                    # 直接是JSON
+                    data = json.loads(response)
+                else:
+                    return response  # 不是JSON格式，返回原始响应
+            except json.JSONDecodeError:
+                return response
+
+            # 解析节奏相关技巧（在C模块）
+            rhythm_techniques = []
+            if "techniques" in data:
+                for tech in data["techniques"]:
+                    if tech.get("module") == "C":  # 节奏调控
+                        rhythm_techniques.append(
+                            f"{tech.get('name', '节奏技巧')}: {tech.get('mechanism', '')}\n"
+                            f"效果: {tech.get('effect', '')}\n"
+                            f"适用情境: {tech.get('trigger_context', '')}"
+                        )
+
+            formatted_result = "节奏分析:\n"
+            if data.get("source_excerpt"):
+                formatted_result += f"摘录: {data['source_excerpt']}\n"
+
+            if rhythm_techniques:
+                formatted_result += "识别的节奏技巧:\n" + "\n".join(rhythm_techniques)
+            else:
+                formatted_result += "未检测到明显的节奏技巧"
+
+            return formatted_result
+        except Exception as e:
+            print(f"节奏分析处理错误: {str(e)}")
+            return f"分析时遇到技术问题: {str(e)}"
 
     async def _identify_classic_paragraph(self, text: str) -> tuple[bool, str]:
-        """判断段落是否是经典段落"""
+        """判断段落是否是经典段落 - 从JSON响应中提取评估"""
         if len(text.strip()) < 50:
             return False, "段落长度不足，不构成经典段落。"
         prompt = self.analysis_prompt_templates["classic_paragraph_analysis"].format(text=text)
         try:
+            import json
             response = await self._get_ai_response(prompt)
-            is_classic = "是" in response[:50]  # 检查前50个字符是否包含"是"
-            return is_classic, response
-        except:
-            return False, "分析出错"
+
+            # 解析JSON响应
+            try:
+                if response.strip().startswith('```json'):
+                    # 提取代码块中的JSON
+                    json_str = response.strip()
+                    if json_str.startswith('```json'):
+                        json_str = json_str[7:]  # 移除```json
+                    if json_str.endswith('```'):
+                        json_str = json_str[:-3]  # 移除末尾 ```
+                    json_str = json_str.strip()
+                    data = json.loads(json_str)
+                elif response.strip().startswith('{') and response.strip().endswith('}'):
+                    # 直接是JSON
+                    data = json.loads(response)
+                else:
+                    # 不是JSON格式，使用原始处理方式
+                    is_classic = "是" in response[:50]  # 检查前50个字符是否包含"是"
+                    return is_classic, response
+            except json.JSONDecodeError:
+                # 如果无法解析JSON，回退到原始处理方式
+                is_classic = "是" in response[:50]
+                return is_classic, response
+
+            # 分析技巧的丰富性来判断是否为经典段落
+            techniques_count = len(data.get("techniques", []))
+            complexity = "low" if techniques_count == 0 else data.get("intensity", "medium")
+
+            is_classic = techniques_count > 0 or data.get("intensity") == "high"
+
+            formatted_result = f"经典段落评估:\n"
+            formatted_result += f"摘录: {data.get('source_excerpt', text[:50] + '...')}\n"
+            formatted_result += f"技巧数量: {techniques_count}\n"
+            formatted_result += f"技巧密度: {data.get('intensity', 'unknown')}\n"
+
+            if data.get("genre_tags"):
+                formatted_result += f"类型标签: {', '.join(data['genre_tags'])}\n"
+
+            if data.get("techniques"):
+                formatted_result += f"识别技巧: {[tech.get('name', 'unknown') for tech in data['techniques']]}\n"
+
+            formatted_result += f"\n评估结果: {'是' if is_classic else '否'}\n"
+            formatted_result += f"理由: 当前段落{'具有' if is_classic else '缺乏'}较丰富的文学技巧和表现力"
+
+            return is_classic, formatted_result
+        except Exception as e:
+            print(f"经典段落识别处理错误: {str(e)}")
+            return False, f"分析时遇到技术问题: {str(e)}"
 
     async def _analyze_character_development(self, text: str) -> str:
-        """分析文本的人物塑造"""
+        """分析文本的人物塑造 - 从JSON响应中提取角色分析"""
         if len(text.strip()) < 10:
             return "没有明显人物"
         prompt = self.analysis_prompt_templates["character_development_analysis"].format(text=text)
         try:
+            import json
             response = await self._get_ai_response(prompt)
-            return response
-        except:
-            return "没有明显人物"
+
+            # 解析JSON响应
+            try:
+                if response.strip().startswith('```json'):
+                    # 提取代码块中的JSON
+                    json_str = response.strip()
+                    if json_str.startswith('```json'):
+                        json_str = json_str[7:]  # 移除```json
+                    if json_str.endswith('```'):
+                        json_str = json_str[:-3]  # 移除末尾 ```
+                    json_str = json_str.strip()
+                    data = json.loads(json_str)
+                elif response.strip().startswith('{') and response.strip().endswith('}'):
+                    # 直接是JSON
+                    data = json.loads(response)
+                else:
+                    # 检查原始响应中是否提及没有人物
+                    if "没有明显人物" in response or "无明显角色" in response or len(response.strip()) < 5:
+                        return "没有明显人物"
+                    return response
+            except json.JSONDecodeError:
+                # 如果JSON解析失败，检查是否提及没有人物
+                if "没有明显人物" in response or "无明显角色" in response:
+                    return "没有明显人物"
+                return response
+
+            # 只找人物驱动技巧（D模块）
+            char_techniques = []
+            if "techniques" in data:
+                for tech in data["techniques"]:
+                    if tech.get("module") == "D":  # 人物驱动
+                        char_techniques.append(
+                            f"{tech.get('name', '角色技巧')}\n"
+                            f"机制: {tech.get('mechanism', '')}\n"
+                            f"效果: {tech.get('effect', '')}\n"
+                            f"情境: {tech.get('trigger_context', '')}"
+                        )
+
+            if not char_techniques:
+                return "没有明显人物"
+
+            formatted_result = "人物塑造分析:\n"
+            if data.get("source_excerpt"):
+                formatted_result += f"摘录: {data['source_excerpt']}\n"
+
+            formatted_result += f"运用的技巧:\n" + "\n".join(char_techniques)
+
+            if data.get("genre_tags"):
+                formatted_result += f"\n类型标签: {', '.join(data['genre_tags'])}"
+
+            return formatted_result
+        except Exception as e:
+            print(f"人物分析处理错误: {str(e)}")
+            return f"分析时遇到技术问题: {str(e)}"
 
     async def _analyze_dialogue(self, text: str) -> str:
-        """分析文本的对话技巧"""
+        """分析文本的对话技巧 - 从JSON响应中提取"""
         if len(text.strip()) < 10 or '“' not in text and '"' not in text:
             return "没有对话"
         prompt = self.analysis_prompt_templates["dialogue_analysis"].format(text=text)
         try:
+            import json
             response = await self._get_ai_response(prompt)
-            return response
-        except:
-            return "没有对话"
+
+            # 解析JSON响应
+            try:
+                if response.strip().startswith('```json'):
+                    # 提取代码块中的JSON
+                    json_str = response.strip()
+                    if json_str.startswith('```json'):
+                        json_str = json_str[7:]  # 移除```json
+                    if json_str.endswith('```'):
+                        json_str = json_str[:-3]  # 移除末尾 ```
+                    json_str = json_str.strip()
+                    data = json.loads(json_str)
+                elif response.strip().startswith('{') and response.strip().endswith('}'):
+                    # 直接是JSON
+                    data = json.loads(response)
+                else:
+                    # 检查原始响应中是否提及没有对话
+                    if "没有对话" in response:
+                        return "没有对话"
+                    return response
+            except json.JSONDecodeError:
+                # 如果JSON解析失败，检查是否提及没有对话
+                if "没有对话" in response:
+                    return "没有对话"
+                return response
+
+            # 只找语言风格和对话技巧（E和F模块）
+            dialogue_techs = []
+            if "techniques" in data:
+                for tech in data["techniques"]:
+                    if tech.get("module") in ["E", "F"]:  # 类型元素或语言风格
+                        if "对话" in tech.get("name", "") or "语言" in tech.get("name", "") or "风格" in tech.get("name", ""):
+                            dialogue_techs.append(
+                                f"{tech.get('name', '对话技巧')}\n"
+                                f"机制: {tech.get('mechanism', '')}\n"
+                                f"效果: {tech.get('effect', '')}"
+                            )
+
+            if not dialogue_techs:
+                return "没有对话"
+
+            formatted_result = "对话技巧分析:\n"
+            if data.get("source_excerpt"):
+                formatted_result += f"摘录: {data['source_excerpt']}\n"
+
+            formatted_result += f"对话技巧:\n" + "\n".join(dialogue_techs)
+
+            if data.get("genre_tags"):
+                formatted_result += f"\n类型标签: {', '.join(data['genre_tags'])}"
+
+            return formatted_result
+        except Exception as e:
+            print(f"对话分析处理错误: {str(e)}")
+            return f"分析时遇到技术问题: {str(e)}"
 
     async def _get_ai_response(self, prompt: str) -> str:
         """使用AI模型获取响应"""
