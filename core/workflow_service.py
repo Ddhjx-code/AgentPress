@@ -30,7 +30,7 @@ class WorkflowService:
         self.conversation_manager = None
         self.prompts = {}
 
-    async def initialize_models(self, api_key: str, base_url: str = "https://api.qnaigc.com/v1", model_name: str = "qwen3-max"):
+    async def initialize_models(self, api_key: str, base_url: str = "https://apis.iflow.cn/v1", model_name: str = "qwen3-max"):
         """初始化模型"""
         # 创建AI模型客户端
         self.model_client = OpenAIChatCompletionClient(

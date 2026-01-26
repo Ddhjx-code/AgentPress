@@ -2,7 +2,7 @@
 Web UI for AgentPress Enhancement
 现在使用统一的核心服务
 """
-from fastapi import FastAPI, Request, HTTPException, Form, WebSocket
+from fastapi import FastAPI, Request, HTTPException, Form, WebSocket, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -14,6 +14,7 @@ import asyncio
 from core.workflow_service import WorkflowService
 from core.agent_manager import ModelConfig
 from knowledge.manager import KnowledgeManager
+from knowledge.novel_knowledge_extender import NovelKnowledgeExtender
 
 app = FastAPI(title="AgentPress 增强版 UI")
 
@@ -24,6 +25,7 @@ app.mount("/static", StaticFiles(directory="ui/static"), name="static")
 # 全局工作流服务实例
 workflow_service = WorkflowService()
 knowledge_manager = KnowledgeManager()
+novel_knowledge_extender = None  # 稍后初始化
 
 # WebSocket连接管理器
 class ConnectionManager:
@@ -60,7 +62,7 @@ async def initialize_workflow(
     初始化工作流服务
     """
     if not base_url:
-        base_url = "https://api.qnaigc.com/v1"
+        base_url = "https://apis.iflow.cn/v1"
     if not model_name:
         model_name = "qwen3-max"
 
@@ -116,9 +118,25 @@ async def add_knowledge_entry(request: Request):
         if not title or not content:
             raise HTTPException(status_code=400, detail="标题和内容不能为空")
 
-        # 在这里添加知识条目的逻辑
-        # 目前我们只是返回一个成功的响应，因为知识库管理器的接口可能需要扩展
-        return {"status": "success", "message": "知识条目添加成功", "id": "temp_id"}
+        # 使用KnowledgeManager添加知识条目
+        success = await knowledge_manager.add_entry(
+            title=title,
+            content=content,
+            tags=tags,
+            knowledge_type=knowledge_type,
+            source=source
+        )
+
+        if success:
+            # 获取完整的条目来返回ID
+            all_entries = await knowledge_manager.get_all_entries()
+            # 找到刚刚添加的条目（按时间排序）
+            entry = max(all_entries, key=lambda e: e.creation_date) if all_entries else None
+            entry_id = entry.id if entry else "unknown"
+
+            return {"status": "success", "message": "知识条目添加成功", "id": entry_id}
+        else:
+            return {"status": "error", "message": "添加知识条目失败"}
 
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -225,6 +243,186 @@ async def get_conversation_history():
     """获取创作的对话历史"""
     history = workflow_service.get_conversation_history()
     return {"history": history}
+
+
+@app.post("/api/process-novel-pdf")
+async def process_novel_pdf(
+    request: Request,
+    pdf_file: UploadFile = Form(...),
+    file_type: str = Form("pdf")
+):
+    """
+    处理上传的小说PDF文件
+    """
+    global novel_knowledge_extender
+
+    # 确保扩展管理器已初始化
+    if novel_knowledge_extender is None:
+        if not workflow_service.model_client:
+            return {"status": "error", "message": "工作流服务未初始化，请先调用 /api/init-workflow"}
+        novel_knowledge_extender = NovelKnowledgeExtender(workflow_service)
+
+    try:
+        # 创建临时文件存储上传的PDF
+        import tempfile
+        import os
+
+        # 创建临时目录和文件
+        temp_dir = Path("temp_pdf_uploads")
+        temp_dir.mkdir(exist_ok=True)
+
+        temp_pdf_path = temp_dir / f"temp_{pdf_file.filename}"
+
+        # 保存上传的文件
+        with open(temp_pdf_path, "wb") as f:
+            import shutil
+            shutil.copyfileobj(pdf_file.file, f)
+
+        # 处理PDF文件
+        result = await novel_knowledge_extender.process_pdf_and_import(str(temp_pdf_path))
+
+        # 清理临时文件
+        try:
+            os.remove(temp_pdf_path)
+        except:
+            pass  # 如果删除失败，不影响响应
+
+        return result
+
+    except Exception as e:
+        logger.error(f"处理上传的PDF文件时出错: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/api/process-novel-pdf-batch")
+async def process_novel_pdf_batch(
+    request: Request
+):
+    """
+    批量处理小说PDF文件（通过提供PDF文件路径列表）
+    """
+    global novel_knowledge_extender
+
+    # 确保扩展管理器已初始化
+    if novel_knowledge_extender is None:
+        if not workflow_service.model_client:
+            return {"status": "error", "message": "工作流服务未初始化，请先调用 /api/init-workflow"}
+        novel_knowledge_extender = NovelKnowledgeExtender(workflow_service)
+
+    try:
+        data = await request.json()
+        pdf_paths = data.get('pdf_paths', [])
+
+        if not pdf_paths:
+            return {"status": "error", "message": "PDF路径列表不能为空"}
+
+        result = await novel_knowledge_extender.process_pdf_batch(pdf_paths)
+        return result
+
+    except Exception as e:
+        logger.error(f"批量处理PDF文件时出错: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+
+@app.get("/api/novel-knowledge-stats")
+async def get_novel_knowledge_stats():
+    """
+    获取小说分析知识库统计信息
+    """
+    global novel_knowledge_extender
+
+    if novel_knowledge_extender is None:
+        if not workflow_service.model_client:
+            return {"status": "error", "message": "工作流服务未初始化，请先调用 /api/init-workflow"}
+        novel_knowledge_extender = NovelKnowledgeExtender(workflow_service)
+
+    try:
+        stats = await novel_knowledge_extender.get_novel_analysis_stats()
+        return {"status": "success", "stats": stats}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.get("/api/search-novel-techniques")
+async def search_novel_techniques(
+    query: str = "",
+    tags: str = None  # 以逗号分隔的标签
+):
+    """
+    搜索小说技巧相关知识
+    """
+    global novel_knowledge_extender
+
+    if novel_knowledge_extender is None:
+        if not workflow_service.model_client:
+            return {"status": "error", "message": "工作流服务未初始化，请先调用 /api/init-workflow"}
+        novel_knowledge_extender = NovelKnowledgeExtender(workflow_service)
+
+    try:
+        # 解析标签参数
+        tags_list = []
+        if tags:
+            tags_list = [tag.strip() for tag in tags.split(',')]
+
+        results = await novel_knowledge_extender.search_novel_techniques(query, tags_list)
+
+        # 只返回知识条目的基本信息
+        simplified_results = []
+        for entry in results:
+            simplified_results.append({
+                "id": entry.id,
+                "title": entry.title,
+                "knowledge_type": entry.knowledge_type,
+                "tags": entry.tags,
+                "source": entry.source,
+                "snippet": entry.content[:200] + "..." if len(entry.content) > 200 else entry.content
+            })
+
+        return {
+            "status": "success",
+            "results": simplified_results,
+            "total": len(simplified_results)
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.get("/api/examples-by-novel-type")
+async def get_examples_by_novel_type(
+    novel_type: str,
+    limit: int = 10
+):
+    """
+    获取特定类型的小说技巧示例
+    """
+    global novel_knowledge_extender
+
+    if novel_knowledge_extender is None:
+        if not workflow_service.model_client:
+            return {"status": "error", "message": "工作流服务未初始化，请先调用 /api/init-workflow"}
+        novel_knowledge_extender = NovelKnowledgeExtender(workflow_service)
+
+    try:
+        results = await novel_knowledge_extender.get_examples_by_novel_type(novel_type, limit)
+
+        simplified_results = []
+        for entry in results:
+            simplified_results.append({
+                "id": entry.id,
+                "title": entry.title,
+                "knowledge_type": entry.knowledge_type,
+                "content": entry.content,
+                "tags": entry.tags,
+                "source": entry.source
+            })
+
+        return {
+            "status": "success",
+            "results": simplified_results,
+            "total": len(simplified_results)
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 @app.get("/api/models")
 async def get_model_configurations():

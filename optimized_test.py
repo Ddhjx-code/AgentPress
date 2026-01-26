@@ -56,7 +56,7 @@ async def run_optimized_test():
 
         await workflow_service.initialize_models(
             api_key=api_key,
-            base_url="https://api.qnaigc.com/v1",
+            base_url="https://apis.iflow.cn/v1",
             model_name="qwen3-max"
         )
         print("✅ 模型初始化完成\n")

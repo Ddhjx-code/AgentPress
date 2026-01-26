@@ -70,4 +70,4 @@ conversation_history.json
 novel_data.json
 novel_story.txt
 final_output.json
-final_story.md
+*.pdf

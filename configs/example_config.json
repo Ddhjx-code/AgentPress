@@ -1,7 +1,7 @@
 {
   "model_config": {
     "model": "qwen3-max",
-    "base_url": "https://api.qnaigc.com/v1",
+    "base_url": "https://apis.iflow.cn/v1",
     "vision": false,
     "function_calling": true,
     "json_output": true

@@ -3,13 +3,23 @@ import asyncio
 from typing import Any, Dict, List, Optional
 from .base import KnowledgeEntry
 from .storage import JsonFileKnowledgeStorage
+from .enhanced_storage import EnhancedKnowledgeStorage  # 新增增强存储
 from .retriever import SimpleKnowledgeRetriever
 
 class KnowledgeManager:
     """Main manager for knowledge base functionality"""
 
-    def __init__(self, storage_path: str = "data/knowledge_repo/json_storage.json"):
-        self.storage = JsonFileKnowledgeStorage(storage_path)
+    def __init__(self, storage_path: str = "data/knowledge_repo/json_storage.json", use_enhanced_storage: bool = False):
+        if use_enhanced_storage:
+            # 使用增强存储系统（按类型分片存储）
+            self.storage = EnhancedKnowledgeStorage(storage_path)
+        else:
+            # 使用传统存储系统（单文件存储）
+            from pathlib import Path
+            if "enhanced" in storage_path or storage_path.endswith("enhanced"):
+                self.storage = EnhancedKnowledgeStorage(storage_path)
+            else:
+                self.storage = JsonFileKnowledgeStorage(storage_path)
         self.retriever = SimpleKnowledgeRetriever(self.storage)
 
     async def add_entry(

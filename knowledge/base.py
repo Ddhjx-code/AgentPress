@@ -16,6 +16,7 @@ class KnowledgeEntry:
     creation_date: str
     last_modified: str
     knowledge_type: str  # "example", "technique", "background", "template"
+    chapter_id: Optional[str] = None  # 关联的章节ID，可选字段
 
 class BaseKnowledgeStorage(ABC):
     """Abstract base class for knowledge storage implementations"""

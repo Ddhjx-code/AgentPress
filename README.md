@@ -18,6 +18,8 @@
 - **Iterative Review**: Multi-round review and refinement until stories meet quality standards
 - **Prompt-Driven**: All agent behaviors defined by detailed prompts for easy customization
 - **Chinese LLM Friendly**: Compatible with Qwen and other OpenAI-compatible models
+- **PDF Literature Analysis**: Extract literary techniques, classic passages, and writing methods from classic novels into knowledge base
+- **Knowledge Base Integration**: Store and retrieve literary techniques for AI writing enhancement
 - **Consistency Checking**: Automatic consistency validation and updates across chapters
 
 ## 🚀 Quick Start
@@ -32,7 +34,7 @@ cd AgentPress
 ```bash
 pip install -r requirements.txt
 # Or manually:
-pip install "autogen-agentchat>=0.7.5" "autogen-ext[openai]>=0.7.5" python-dotenv
+pip install "autogen-agentchat>=0.7.5" "autogen-ext[openai]>=0.7.5" python-dotenv PyMuPDF>=1.23.0
 ```
 
 ### 3. Configure API key
@@ -43,24 +45,51 @@ QWEN_API_KEY=your_api_key_here
 
 ### 4. Run the example
 ```bash
+# For standard novel creation
 python main.py
+
+# For processing PDF novels and storing their techniques in knowledge base
+python process_novels.py /path/to/your/pdf_directory --mode directory
 ```
 
-### 5. Check outputs in output/ directory
+### 5. Start the Web UI
+```bash
+# Start the web server
+python app.py
+
+# Access the UI at http://localhost:8000
+```
+
+### 6. Check outputs in output/ directory
 - `output/novel_story_*.txt` - Final story content
 - `output/novel_data_*.json` - Complete structured data
 - `output/conversation_history_*.json` - Full conversation records
+- `data/knowledge_repo/json_storage.json` - Knowledge base with extracted techniques
 
 ## 📁 Project Structure
 
 AgentPress/
 ├── main.py                          # Entry point with async support
+├── app.py                           # Web UI server entry point
+├── process_novels.py                # PDF novel processing command-line tool
 ├── phases.py                        # Workflow orchestrator
 ├── src/                             # Core modules directory
 │   ├── novel_phases_manager.py      # Complete multi-phase writing implementation
 │   └── documentation_manager.py     # Story consistency management
-├── agents_manager.py                # AI agent manager
-├── conversation_manager.py          # Communication and history manager
+├── core/                            # Core services directory
+│   ├── workflow_service.py          # Unified core service
+│   ├── agent_manager.py             # AI agent manager
+│   └── conversation_manager.py      # Communication and history manager
+├── knowledge/                       # Knowledge management system
+│   ├── base.py                     # Knowledge entry base classes
+│   ├── storage.py                  # Knowledge storage implementation
+│   ├── retriever.py                # Knowledge retrieval implementation
+│   ├── manager.py                  # Knowledge manager interface
+│   ├── pdf_processor.py            # PDF processing module
+│   ├── literary_analyzer.py        # Literary analysis AI agent
+│   └── novel_knowledge_extender.py # Novel knowledge extension manager
+├── apps/                            # Application endpoints
+│   └── web_ui.py                   # Web UI with enhanced endpoints
 ├── config.py                        # Configuration and settings
 ├── utils.py                         # Utility functions
 ├── prompts/                         # Detailed agent prompts
@@ -69,16 +98,23 @@ AgentPress/
 │   ├── fact_checker.md             # Fact checker system prompt
 │   ├── dialogue_specialist.md      # Dialogue reviewer system prompt
 │   └── editor.md                   # Final editor system prompt
+├── ui/                              # UI templates and assets
+│   ├── templates/                  # HTML templates
+│   └── static/                     # CSS, JS, and image files
 ├── output/                         # Generated content directory
 │   ├── novel_story_*.txt           # Story text files
 │   ├── novel_data_*.json           # Complete structured output
 │   └── conversation_history_*.json # Communication logs
+├── data/knowledge_repo/            # Knowledge base storage
+│   └── json_storage.json           # JSON format knowledge base
+├── NOVEL_PDF_PROCESSING.md         # PDF processing documentation
 └── .env                            # API configuration
 
 ## 🎯 Use Cases
 
 - **Mythological Fiction**: "Shan Hai Jing"-style stories
 - **Novel Writing**: Multi-chapter story creation with consistency
+- **Literature Analysis**: Extract techniques and passages from classic novels
 - **Content Creation**: AI-assisted fiction writing
 - **Multi-Agent Collaboration**: AI agent coordination research
 - **Prompt Engineering**: High-quality prompt experimentation
@@ -96,6 +132,9 @@ To adapt to different genres, modify prompt files in `prompts/` directory:
 This system uses a clean, modular architecture with clear separation of concerns:
 - **Orchestration layer**: `main.py` and `phases.py`
 - **Business logic**: `src/novel_phases_manager.py`
+- **Core Services**: `core/workflow_service.py` and `core/agent_manager.py`
+- **Knowledge Management**: `knowledge/` directory with PDF processing, literary analysis, and knowledge storage
+- **Web Services**: `apps/web_ui.py` with enhanced API endpoints
 - **Data management**: `src/documentation_manager.py` and `conversation_manager.py`
 - **AI agents**: `agents_manager.py` and `prompts/`
 

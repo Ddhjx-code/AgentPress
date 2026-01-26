@@ -62,7 +62,7 @@ MAX_REVISION_ROUNDS = 3
 # 模型配置
 MODEL_CONFIG = {
     "model": "qwen3-max",
-    "base_url": "https://api.qnaigc.com/v1",
+    "base_url": "https://apis.iflow.cn/v1",
     "vision": False,
     "function_calling": True,
     "json_output": True
