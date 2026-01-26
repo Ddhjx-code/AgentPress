@@ -31,6 +31,14 @@ AGENT_CONFIGS = {
     "documentation_specialist": {
         "display_name": "📋 档案员",
         "description": "维护故事一致性和人物档案"
+    },
+    "write_enviroment_specialist": {
+        "display_name": "🌆 描写专家",
+        "description": "优化环境和感官描写技巧"
+    },
+    "write_rate_specialist": {
+        "display_name": "⏱️ 节奏专家",
+        "description": "优化叙事节奏和情绪曲线"
     }
 }
 
@@ -45,6 +53,11 @@ GROUPCHAT_CONFIGS = {
         "agents": ["fact_checker", "dialogue_specialist", "editor"],
         "max_turns": 5,
         "description": "评审和修订"
+    },
+    "style_phase": {
+        "agents": ["write_enviroment_specialist", "write_rate_specialist", "dialogue_specialist"],
+        "max_turns": 4,
+        "description": "风格优化和润色"
     }
 }
 

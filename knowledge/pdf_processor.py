@@ -113,12 +113,17 @@ class PDFProcessor:
             分段列表，每个元素包含段落内容、位置等信息
         """
         # 清理文本 - 移除多余的换行符和空格
+        print("🧹 正在清理文本内容...")
         cleaned_content = self._clean_content(content)
 
         # 按照段落进行分割
+        print("✂️  正在按段落分割内容...")
         paragraphs = self._split_into_paragraphs(cleaned_content)
+        total_paragraphs = len(paragraphs)
+        print(f"✅ 段落分割完成，共 {total_paragraphs} 个段落")
 
         # 识别章节划分
+        print("챕 正在识别章节划分...")
         segmented_paragraphs = self._identify_chapters(paragraphs)
 
         # 为每个段落创建结构化信息
@@ -135,7 +140,13 @@ class PDFProcessor:
             }
             result.append(paragraph_info)
 
+            # 每处理100个段落显示一次进度
+            if (i + 1) % 100 == 0:
+                progress = (i + 1) / total_paragraphs * 100
+                print(f"📝 已处理 {i+1}/{total_paragraphs} 个段落 ({progress:.1f}%)")
+
         logger.info(f"内容已分割为 {len(result)} 个段落段")
+        print(f"✅ 内容已分割为 {len(result)} 个分段条目")
         return result
 
     def _clean_content(self, content: str) -> str:
@@ -269,20 +280,27 @@ class PDFProcessor:
         Returns:
             经过分段的PDF内容列表
         """
+        print(f"📖 开始处理PDF文件: {Path(pdf_path).name}")
         logger.info(f"开始处理PDF: {pdf_path}")
 
         # 提取完整内容
+        print("🔍 正在提取PDF内容...")
         pdf_data = self.extract_pdf_content(pdf_path)
         title = pdf_data['title']
         content = pdf_data['content']
+        total_pages = pdf_data['total_pages']
+
+        print(f"✅ PDF内容提取完成 ({total_pages} 页)")
 
         # 分段处理
+        print("✂️  正在对内容进行分段...")
         segmented_content = self.segment_content(content)
 
         # 添加小说标题到每段
         for segment in segmented_content:
             segment['original_title'] = title
 
+        print(f"✅ PDF内容分段完成，共分割出 {len(segmented_content)} 个段落")
         logger.info(f"PDF处理完成，共分割出 {len(segmented_content)} 个段落段")
         return segmented_content
 

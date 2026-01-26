@@ -58,7 +58,7 @@ async def initialize_workflow():
 
 async def process_single_pdf(pdf_path: str, extender: NovelKnowledgeExtender):
     """处理单个PDF文件"""
-    print(f"📄 处理PDF文件: {pdf_path}")
+    print(f"📁 准备处理文件: {Path(pdf_path).name}")
     result = await extender.process_pdf_and_import(pdf_path)
 
     print(f"📊 处理结果:")

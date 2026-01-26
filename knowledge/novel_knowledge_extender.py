@@ -49,16 +49,20 @@ class NovelKnowledgeExtender:
             if not file_path.exists():
                 raise FileNotFoundError(f"PDF文件不存在: {pdf_path}")
 
+            print(f"📚 开始处理PDF文件: {file_path.name}")
             logger.info(f"开始处理PDF文件: {pdf_path}")
 
             # 1. PDF内容提取和分割
+            print("🔄 步骤1: 提取并分段PDF内容...")
             logger.info("步骤1: 提取并分段PDF内容...")
             segments = self.pdf_processor.process_pdf(pdf_path)
 
             total_segments = len(segments)
+            print(f"✅ PDF内容已分割为 {total_segments} 个段落")
             logger.info(f"PDF内容已分割为 {total_segments} 个段落")
 
             # 2. 使用AI分析器分析每个段落
+            print(f"🔄 步骤2: 使用AI分析 {total_segments} 个段落...")
             logger.info("步骤2: 使用AI分析每个段落...")
             knowledge_entries = await self.literary_analyzer.batch_analyze(
                 segments,
@@ -66,12 +70,14 @@ class NovelKnowledgeExtender:
             )
 
             # 3. 生成章节级分析摘要（基于段落分析结果）
+            print("🔄 步骤3: 生成章节级分析摘要...")
             logger.info("步骤3: 生成章节级分析摘要...")
             chapter_analyzer = ChapterAnalyzer(self.workflow_service.model_client)
             chapter_summaries = await chapter_analyzer.analyze_chapters_from_segments(segments)
 
             # 添加章节摘要作为新的知识条目
-            for chapter_summary in chapter_summaries:
+            print(f"🔄 正在保存章节分析结果...")
+            for i, chapter_summary in enumerate(chapter_summaries):
                 success = await self.km.add_entry(
                     title=chapter_summary.title,
                     content=chapter_summary.content,
@@ -82,7 +88,10 @@ class NovelKnowledgeExtender:
                 if success:
                     knowledge_entries.append(chapter_summary)
 
+            print(f"✅ 章节分析摘要已保存 ({len(chapter_summaries)} 个)")
+
             # 4. 整体结构分析（基于章节摘要）
+            print("🔄 步骤4: 进行整书结构分析...")
             logger.info("步骤4: 进行整书结构分析...")
             try:
                 overall_analysis = await chapter_analyzer.analyze_overall_narrative_structure(
@@ -99,13 +108,17 @@ class NovelKnowledgeExtender:
                     )
                     if success:
                         knowledge_entries.append(overall_analysis)
+                    print("✅ 整书结构分析已保存")
             except Exception as e:
                 logger.warning(f"整书结构分析出错，将跳过: {str(e)}")
+                print(f"⚠️  整书结构分析出错: {str(e)}")
 
-            # 5. 批量保存到知识库
+            # 5. 总结处理结果
+            print(f"🔄 步骤5: 保存所有知识条目到知识库...")
             logger.info(f"步骤5: 批量保存 {len(knowledge_entries)} 个知识条目到知识库...")
             successful_imports = 0
-            for entry in knowledge_entries:
+            total_entries = len(knowledge_entries)
+            for i, entry in enumerate(knowledge_entries):
                 try:
                     success = await self.km.add_entry(
                         title=entry.title,
@@ -119,6 +132,18 @@ class NovelKnowledgeExtender:
                 except Exception as e:
                     logger.error(f"保存知识条目失败 (ID: {entry.id}): {str(e)}")
 
+                # 每处理10个条目或在关键节点显示一次进度
+                if (i + 1) % 10 == 0 or (i + 1) == total_entries or i == 0:
+                    progress_percent = ((i + 1) / total_entries) * 100
+                    print(f"💾 已保存 {i+1}/{total_entries} 个知识条目到JSON文件 ({progress_percent:.1f}%)")
+
+                # 每处理50个条目后，显示当前存储状态
+                if (i + 1) % 50 == 0:
+                    current_stats = await self.get_novel_analysis_stats()
+                    print(f"📊 当前知识库统计: 共 {current_stats['total_knowledge_entries']} 个条目 | "
+                          f"小说分析: {current_stats['novel_analysis_entries']} 个 | "
+                          f"来源PDF: {current_stats['unique_sources']} 个")
+
             # 6. 生成处理报告
             result = {
                 'status': 'success',
@@ -130,11 +155,19 @@ class NovelKnowledgeExtender:
                 'message': f"成功处理PDF文件，创建了 {successful_imports} 个知识条目 (含段落级、章节级、全书级分析)"
             }
 
+            print(f"🎉 PDF处理完成!")
+            print(f"📊 统计信息:")
+            print(f"   - 总段落数: {total_segments}")
+            print(f"   - 创建知识条目: {len(knowledge_entries)}")
+            print(f"   - 成功导入: {successful_imports}")
+            print(f"   - 失败导入: {len(knowledge_entries) - successful_imports}")
+
             logger.info(f"PDF处理完成: {result['message']}")
             return result
 
         except Exception as e:
             logger.error(f"处理PDF文件时出错: {str(e)}")
+            print(f"❌ 处理PDF文件时出错: {str(e)}")
             return {
                 'status': 'error',
                 'pdf_file': pdf_path,
@@ -155,6 +188,8 @@ class NovelKnowledgeExtender:
         Returns:
             批量处理结果汇总
         """
+        total_files = len(pdf_paths)
+        print(f"📚 开始批量处理 {total_files} 个PDF文件...")
         logger.info(f"开始批量处理 {len(pdf_paths)} 个PDF文件...")
 
         results = []
@@ -162,13 +197,21 @@ class NovelKnowledgeExtender:
         total_entries = 0
 
         for i, pdf_path in enumerate(pdf_paths):
-            logger.info(f"处理进度: {i+1}/{len(pdf_paths)} - {pdf_path}")
+            current_file_num = i + 1
+            progress_percent = current_file_num / total_files * 100
+            print(f"\n📋 进度: {current_file_num}/{total_files} ({progress_percent:.1f}%) - {Path(pdf_path).name}")
+            logger.info(f"处理进度: {current_file_num}/{total_files} - {pdf_path}")
 
             result = await self.process_pdf_and_import(pdf_path)
             results.append(result)
 
             total_successful += result.get('successful_imports', 0)
             total_entries += result.get('knowledge_entries_created', 0)
+
+            # 显示当前进度汇总
+            print(f"📈 当前汇总: 已处理 {current_file_num} 个文件，"
+                  f"累计生成 {total_entries} 个知识条目，"
+                  f"成功导入 {total_successful} 个")
 
         # 汇总结果
         overall_result = {
@@ -181,6 +224,15 @@ class NovelKnowledgeExtender:
             'failed_imports': total_entries - total_successful,
             'individual_results': results
         }
+
+        print(f"\n🎉 批量处理完成!")
+        print(f"📊 最终统计:")
+        print(f"   - 总处理文件数: {total_files}")
+        print(f"   - 成功处理: {overall_result['successful_files']}")
+        print(f"   - 失败处理: {overall_result['failed_files']}")
+        print(f"   - 创建知识条目: {total_entries}")
+        print(f"   - 成功导入: {total_successful}")
+        print(f"   - 导入失败: {total_entries - total_successful}")
 
         logger.info(f"批量处理完成: 成功处理 {overall_result['successful_files']} 个文件, "
                    f"创建 {total_successful} 个知识条目")

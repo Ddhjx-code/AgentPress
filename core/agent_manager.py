@@ -18,7 +18,9 @@ class ModelConfig:
             "fact_checker": self._get_fact_checker_config(),
             "dialogue_specialist": self._get_dialogue_specialist_config(),
             "mythologist": self._get_researcher_config(),
-            "documentation_specialist": self._get_documentation_config()
+            "documentation_specialist": self._get_documentation_config(),
+            "write_enviroment_specialist": self._get_environment_specialist_config(),
+            "write_rate_specialist": self._get_rhythm_specialist_config()
         }
 
     def _get_writer_config(self):
@@ -67,6 +69,22 @@ class ModelConfig:
             "model": os.getenv("DOCUMENTATION_MODEL", "gpt-4"),
             "description": "Maintain consistency across long-form content",
             "capabilities": ["memory_retention", "consistency_tracking"]
+        }
+
+    def _get_environment_specialist_config(self):
+        # Description-focused model
+        return {
+            "model": os.getenv("ENVIRONMENT_MODEL", "gpt-4"),
+            "description": "Environmental description and sensory detail optimization",
+            "capabilities": ["environmental_depiction", "sensory_detail"]
+        }
+
+    def _get_rhythm_specialist_config(self):
+        # Rhythm and pacing focused model
+        return {
+            "model": os.getenv("RHYTHM_MODEL", "gpt-4"),
+            "description": "Narrative rhythm and emotional pacing optimization",
+            "capabilities": ["story_pacing", "emotional_control"]
         }
 
 
