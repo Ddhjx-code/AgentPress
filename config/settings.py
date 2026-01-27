@@ -16,11 +16,20 @@ import importlib.util
 import sys
 
 # 使用动态导入来避免模块名冲突
-config_path = Path(__file__).parent.parent / "config.py"
-spec = importlib.util.spec_from_file_location("original_config", config_path)
-original_config = importlib.util.module_from_spec(spec)
-sys.modules["original_config"] = original_config
-spec.loader.exec_module(original_config)
+try:
+    config_path = Path(__file__).parent.parent / "config.py"
+    spec = importlib.util.spec_from_file_location("original_config", config_path)
+    original_config = importlib.util.module_from_spec(spec)
+    sys.modules["original_config"] = original_config
+    spec.loader.exec_module(original_config)
+except FileNotFoundError:
+    # 如果文件不存在（比如在打包后运行时），直接导入标准config
+    try:
+        import config as original_config
+    except ImportError:
+        # 尝试其他方式获取配置
+        import importlib
+        original_config = importlib.import_module('config')
 
 # 从原始配置中获取设置
 CREATION_CONFIG = original_config.CREATION_CONFIG

@@ -109,7 +109,8 @@ class ResearchPhase:
             "symbol_analysis": symbol_analysis,
             "target_length_suggestion": {
                 "suggested": target_length,
-                "confidence": symbol_analysis.get("target_length", {}).get("confidence", 0.6)
+                "confidence": (symbol_analysis.get("target_length", {}).get("confidence", 0.6)
+                          if isinstance(symbol_analysis, dict) else 0.6)
             }
         }
 

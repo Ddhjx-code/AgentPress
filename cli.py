@@ -9,11 +9,17 @@ import sys
 import os
 from pathlib import Path
 from typing import Dict, Any
+from typing import TYPE_CHECKING
 import json
 
 # 添加项目路径（将当前目录添加到Python路径的前面）
 project_path = Path(__file__).parent
 sys.path.insert(0, str(project_path))
+
+if TYPE_CHECKING:
+    # 仅用于静态类型检查，避免IDE警告
+    from config import HierarchicalConfigManager
+    from config import DEFAULT_SETTINGS
 
 # 导入项目模块（使用适当的路径调整）
 try:
@@ -25,13 +31,28 @@ try:
     if str(project_path) not in sys.path:
         sys.path.insert(0, str(project_path))
 
-    # 处理配置管理器的导入
-    config_settings_path = project_path / "config" / "settings.py"
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("settings", config_settings_path)
-    settings_module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(settings_module)
-    HierarchicalConfigManager = settings_module.HierarchicalConfigManager
+    # 实际运行时的处理逻辑
+    try:
+        config_settings_path = project_path / "config" / "settings.py"
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("settings", config_settings_path)
+        settings_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(settings_module)
+        HierarchicalConfigManager = settings_module.HierarchicalConfigManager
+    except (FileNotFoundError, ModuleNotFoundError):
+        # 如果文件不存在（如在打包环境），使用标准导入
+        try:
+            import config
+            # 直接从模块对象获取
+            HierarchicalConfigManager = getattr(config.settings, 'HierarchicalConfigManager', None)
+            if HierarchicalConfigManager is None:
+                import importlib
+                config_settings_module = importlib.import_module('config.settings')
+                HierarchicalConfigManager = getattr(config_settings_module, 'HierarchicalConfigManager', None)
+        except ImportError:
+            import importlib
+            config_settings_module = importlib.import_module('config.settings')
+            HierarchicalConfigManager = config_settings_module.HierarchicalConfigManager
 
     # 现在导入其他模块
     from core.agent_manager import AgentManager
@@ -90,6 +111,7 @@ def create_argument_parser():
     config_parser.add_argument('--show-default', action='store_true', help='显示默认配置')
     config_parser.add_argument('--export', help='导出当前配置到JSON文件')
     config_parser.add_argument('--list-parameters', action='store_true', help='列出所有可配置参数')
+    config_parser.add_argument('--config-file', help='配置文件路径')
 
     # status 子命令
     status_parser = subparsers.add_parser('status', help='显示工作流状态')
@@ -195,6 +217,9 @@ def run_generate_command(args: argparse.Namespace):
 
         print("✅ 代理管理器初始化成功")
 
+        # 创建文档管理器
+        documentation_manager = DocumentationManager()
+
         # 创建工作流协调器
         orchestrator = NovelWorkflowOrchestrator()
 
@@ -211,7 +236,7 @@ def run_generate_command(args: argparse.Namespace):
         result = await orchestrator.run_async_workflow(
             initial_idea=concept,
             multi_chapter=True,
-            agents_manager=agent_manager,
+            agent_handlers_map=agent_manager.create_agent_handlers_map(documentation_manager) if agent_manager else None,
             enable_manual_control=args.enable_manual_control
         )
 
@@ -259,7 +284,38 @@ def run_generate_command(args: argparse.Namespace):
 
 def run_info_command(args: argparse.Namespace):
     """执行info命令"""
-    from config.settings import DEFAULT_SETTINGS
+    # 为静态分析提供类型提示
+    try:
+        from config.settings import DEFAULT_SETTINGS  # type: ignore
+    except ImportError:
+        DEFAULT_SETTINGS = None  # 仅为静态分析提供类型提示
+
+    try:
+        import importlib.util
+        settings_path = Path(__file__).parent / "config" / "settings.py"
+        if settings_path.exists():
+            spec = importlib.util.spec_from_file_location("config_settings", settings_path)
+            settings_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(settings_module)
+            DEFAULT_SETTINGS = settings_module.DEFAULT_SETTINGS
+        else:
+            # 如果打包环境，使用模块导入方式
+            try:
+                import config
+                DEFAULT_SETTINGS = config.settings.DEFAULT_SETTINGS
+            except ImportError:
+                # 使用importlib方式作为最后备选
+                import importlib
+                settings_module = importlib.import_module('config.settings')
+                DEFAULT_SETTINGS = settings_module.DEFAULT_SETTINGS
+    except (ImportError, AttributeError, FileNotFoundError):
+        # 如果都无法导入，用通用消息
+        print("📚 AgentPress 系统信息")
+        print("=" * 50)
+        print("配置模块导入失败")
+        print(f"版本: 1.0.0")
+        print(f"当前工作目录: {os.getcwd()}")
+        return
 
     print("📚 AgentPress 系统信息")
     print("=" * 50)
@@ -294,7 +350,33 @@ def run_config_command(args: argparse.Namespace):
                     print(f"  - {param['name']}: {current} ({param['display_name']})")
 
     elif args.show_default:
-        from config.settings import DEFAULT_SETTINGS
+        # 为静态分析提供类型提示
+        try:
+            from config.settings import DEFAULT_SETTINGS  # type: ignore
+        except ImportError:
+            DEFAULT_SETTINGS = None  # 仅为静态分析提供类型提示
+
+        try:
+            import importlib.util
+            settings_path = Path(__file__).parent / "config" / "settings.py"
+            if settings_path.exists():
+                spec = importlib.util.spec_from_file_location("config_settings", settings_path)
+                settings_module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(settings_module)
+                DEFAULT_SETTINGS = settings_module.DEFAULT_SETTINGS
+            else:
+                # 如果打包环境，使用模块导入方式
+                try:
+                    import config
+                    DEFAULT_SETTINGS = config.settings.DEFAULT_SETTINGS
+                except ImportError:
+                    # 使用importlib方式作为最后备选
+                    import importlib
+                    settings_module = importlib.import_module('config.settings')
+                    DEFAULT_SETTINGS = settings_module.DEFAULT_SETTINGS
+        except (ImportError, AttributeError, FileNotFoundError):
+            print("❌ 无法加载默认配置参数")
+            return
         print("📋 默认配置参数:")
         for config_key, config_dict in DEFAULT_SETTINGS.items():
             print(f"\n【{config_key}】")
