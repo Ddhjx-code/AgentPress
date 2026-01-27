@@ -1,0 +1,130 @@
+#!/usr/bin/env python3
+"""
+生成大于5000字的长篇故事
+"""
+import asyncio
+import sys
+from pathlib import Path
+import json
+
+# 添加项目路径
+project_path = Path(__file__).parent
+sys.path.insert(0, str(project_path))
+
+from config import CREATION_CONFIG
+from src.novel_phases_manager import NovelWritingPhases
+from core.agent_manager import AgentManager
+from core.conversation_manager import ConversationManager
+from src.documentation_manager import DocumentationManager
+from utils import load_all_prompts
+from autogen_ext.models.openai import OpenAIChatCompletionClient
+
+
+async def generate_long_story():
+    """生成一个大于5000字的长篇故事"""
+    # 加载提示词
+    prompts_dir = Path("prompts")
+    prompts = load_all_prompts(prompts_dir)
+
+    # 检查是否有必要提示词
+    if not prompts:
+        print("❌ 无法加载提示词文件")
+        return
+
+    # 更新创作配置以支持更长的故事
+    print("📝 更新配置以支持大于5000字的长篇故事...")
+    long_story_config = {
+        'num_chapters': 1,
+        'target_length_per_chapter': 6000,  # 增加每章目标到6000字
+        'total_target_length': 6000        # 总目标字数设置为6000字
+    }
+
+    import os
+    from dotenv import load_dotenv
+    load_dotenv()  # 加载环境变量
+
+    # 从环境变量获取API密钥
+    api_key = os.getenv("QWEN_API_KEY")
+    if not api_key:
+        print("❌ 未找到QWEN_API_KEY环境变量")
+        return
+
+    # 创建模型客户端，使用ModelInfo
+    from autogen_core.models import ModelInfo, ModelFamily
+
+    model_client = OpenAIChatCompletionClient(
+        model="qwen3-max",
+        api_key=api_key,
+        base_url="https://apis.iflow.cn/v1",
+        model_info=ModelInfo(
+            vision=False,
+            function_calling=True,
+            json_output=True,
+            structured_output=False,
+            family=ModelFamily.GPT_5
+        )
+    )
+
+    # 创建代理管理器
+    agent_manager = AgentManager(model_client)
+    initialized = await agent_manager.initialize(prompts)
+
+    if not initialized:
+        print("❌ 代理管理器初始化失败")
+        return
+
+    # 创建其他必要组件
+    conversation_manager = ConversationManager()
+    documentation_manager = DocumentationManager()
+
+    # 创建创作流程
+    novel_phases = NovelWritingPhases(conversation_manager, documentation_manager)
+    novel_phases.agents_manager = agent_manager
+
+    # 读取测试概念
+    with open("test_concept.txt", 'r', encoding='utf-8') as f:
+        concept = f.read()
+
+    print(f"📚 使用概念: {concept[:100]}...")
+
+    print("🔍 开始第一阶段：研究和规划...")
+    research_data = await novel_phases.async_phase1_research_and_planning(concept)
+
+    print("✍️ 开始第二阶段：生成大于5000字的长篇故事...")
+    long_story = await novel_phases.async_phase2_creation(research_data)
+
+    print(f"✅ 生成的长篇故事长度: {len(long_story)} 字符")
+
+    # 保存生成的故事
+    output_dir = Path("output")
+    output_dir.mkdir(exist_ok=True)
+
+    story_file = output_dir / "long_story_6000_chars.txt"
+    with open(story_file, 'w', encoding='utf-8') as f:
+        f.write(long_story)
+
+    print(f"💾 长篇故事已保存: {story_file}")
+
+    # 同时保存完整的代理工作日志
+    if hasattr(novel_phases, 'agent_work_log'):
+        log_file = output_dir / "long_story_agent_log.json"
+        with open(log_file, 'w', encoding='utf-8') as f:
+            json.dump(novel_phases.agent_work_log, f, ensure_ascii=False, indent=2)
+        print(f"📋 代理工作日志已保存: {log_file}")
+
+    return long_story
+
+
+if __name__ == "__main__":
+    try:
+        result = asyncio.run(generate_long_story())
+        if result and len(result) > 5000:
+            print(f"\n🎉 成功生成大于5000字的长篇故事! 实际长度: {len(result)} 字符")
+        elif result:
+            print(f"\n⚠️  生成的故事长度: {len(result)} 字符，没有达到5000字，可能需要增加迭代或丰富情节内容")
+        else:
+            print("\n❌ 生成失败")
+    except Exception as e:
+        print(f"❌ 生成过程出现错误: {e}")
+        import traceback
+        traceback.print_exc()

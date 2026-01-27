@@ -24,6 +24,13 @@ class NovelWritingPhases:
         self.story_state_manager = None  # For tracking multi-chapter story state
         self.progress_callback = None  # For progress notifications
         self.agent_work_log = []  # Log to store all agent activities
+        # 导入配置管理器
+        try:
+            from core.config_manager import ConfigManager
+            self.config_manager = ConfigManager()
+        except ImportError:
+            # 如果没有配置管理器，则使用原始配置
+            self.config_manager = None
 
     def log_agent_activity(self, phase: str, agent_name: str, task: str, result: str, metadata: dict = None):
         """Log agent activity for tracking and reporting"""
@@ -286,7 +293,14 @@ class NovelWritingPhases:
             initial_metadata={'research_data': research_data}
         )
 
-        total_expected_length = CREATION_CONFIG.get("total_target_length", 3000)
+        # 从配置管理器获取目标长度，支持UI配置
+        if self.config_manager:
+            target_length = self.config_manager.get_creation_config().get("total_target_length", 5000)
+        else:
+            from config import CREATION_CONFIG
+            target_length = CREATION_CONFIG.get("total_target_length", 5000)
+
+        total_expected_length = target_length
         print(f"📏 故事进度追踪 [ 0% ]")
 
         while True:  # Continue until AI decides to stop
@@ -392,58 +406,58 @@ class NovelWritingPhases:
                 {"chapter_num": chapter_count, "decision": chapter_decision, "continuity": continuity_report}
             )
 
-            # Apply documentation and style improvements if agents available
+            # Apply consistency and complexity management if agents available
             doc_agent = self.agents_manager.get_agent("documentation_specialist")
             if doc_agent:
-                print(f"📋 正在更新文档...", end="", flush=True)
+                print(f"📚 正在管理复杂度和连贯性...", end="", flush=True)
                 await self._update_documentation_for_chapter(
                     current_content, chapter_count, doc_agent
                 )
-                # 记录文档代理的活动
+                # 记录复杂度控制员的活动
                 self.log_agent_activity(
                     phase="creation_phase",
                     agent_name="documentation_specialist",
-                    task=f"Update documentation for chapter {chapter_count}",
-                    result=f"Updated documentation for chapter {chapter_count}",
+                    task=f"Manage consistency for chapter {chapter_count}",
+                    result=f"Managed consistency for chapter {chapter_count}",
                     metadata={
                         "chapter_num": chapter_count,
-                        "action": "documentation_update"
+                        "action": "consistency_management"
                     }
                 )
                 print(" 完成!")
 
-            # Apply environment and rhythm improvements if available
+            # Apply environmental and emotional rhythm improvements if available
             env_agent = self.agents_manager.get_agent("write_enviroment_specialist")
             rate_agent = self.agents_manager.get_agent("write_rate_specialist")
 
             if env_agent or rate_agent:
-                print(f"🎨 正在优化环境描写和节奏...", end="", flush=True)
-                # 优化环境描写和叙事节奏（如果代理可用）
+                print(f"🎨 正在优化感官体验和情绪节拍...", end="", flush=True)
+                # 优化感官呈现和情绪节奏（如果代理可用）
                 if env_agent:
                     env_optimization = await self._optimize_environment_descriptions(new_content, chapter_info, env_agent)
-                    # 记录环境代理的活动
+                    # 记录感官呈现专家的活动
                     self.log_agent_activity(
                         phase="creation_phase",
                         agent_name="write_enviroment_specialist",
-                        task=f"Optimize environment descriptions for chapter {chapter_count}",
+                        task=f"Optimize sensory presentation for chapter {chapter_count}",
                         result=str(env_optimization) if env_optimization else "No optimization suggestions",
                         metadata={
                             "chapter_num": chapter_count,
-                            "action": "environment_optimization"
+                            "action": "sensory_optimization"
                         }
                     )
 
                 if rate_agent:
                     rate_optimization = await self._optimize_rhythm(new_content, chapter_info, rate_agent)
-                    # 记录节奏代理的活动
+                    # 记录情绪节拍师的活动
                     self.log_agent_activity(
                         phase="creation_phase",
                         agent_name="write_rate_specialist",
-                        task=f"Optimize rhythm for chapter {chapter_count}",
+                        task=f"Optimize emotional rhythm for chapter {chapter_count}",
                         result=str(rate_optimization) if rate_optimization else "No optimization suggestions",
                         metadata={
                             "chapter_num": chapter_count,
-                            "action": "rhythm_optimization"
+                            "action": "emotional_rhythm_optimization"
                         }
                     )
                 print(" 完成!")
@@ -453,14 +467,38 @@ class NovelWritingPhases:
             current_progress = min(100, int(current_total_length / total_expected_length * 100))
             print(f"📊 进度摘要: [{current_progress}%] 总计 {len(chapters)} 章节 | {current_total_length} 字符")
 
-            # Check if AI suggests ending the story - 更严格的章节控制
-            if chapter_decision.get("should_end", False) or chapter_count >= 1:  # 限制为1章以控制长度
-                print(f"🎯 AI认为当前是合适的章节结束点或达到章数限制，停止生成更多章节")
+            import re
+
+            # 计算中文汉字的实际数量
+            chinese_chars_count = len(re.findall(r'[\u4e00-\u9fff]', current_content))
+
+            # 从配置中获取目标汉字数，以支持UI配置
+            from config import CREATION_CONFIG
+            target_chinese_chars = CREATION_CONFIG.get("min_chinese_chars", 5000)
+
+            print(f"📈 中文汉字统计: {chinese_chars_count} 汉字 (目标: {target_chinese_chars} 汉字)")
+
+            # Check if AI suggests ending the story - 现在按汉字数量为主要目标
+            # 即使AI认为应该结束，也要达到目标汉字数才算完成
+            if chinese_chars_count >= target_chinese_chars:
+                print(f"🎯 达到目标汉字数 {target_chinese_chars} 字，停止生成更多章节")
                 break
+            elif chapter_decision.get("should_end", False):
+                print(f"🤖 AI认为当前可以结束章节，但继续生成以达到目标汉字数")
+                # 如果AI认为可以结束但还没达到目标汉字数，则继续
+                continue
 
             # 检查总长度 - 增加总长度强制限制
-            if current_total_length >= total_expected_length:
-                print(f"📏 总长度达到目标限制 ({current_total_length} 字符，目标: {total_expected_length} 字符)，停止生成")
+            # 使用实际中文汉字数，而不是总字符数
+            import re
+            chinese_chars_count = len(re.findall(r'[\u4e00-\u9fff]', current_content))
+
+            # 从配置中获取目标汉字数，以支持UI配置
+            from config import CREATION_CONFIG
+            target_chinese_chars = CREATION_CONFIG.get("min_chinese_chars", 5000)
+
+            if chinese_chars_count >= target_chinese_chars:  # 使用配置的目标汉字数
+                print(f"📏 总长度达到目标限制 ({chinese_chars_count} 中文汉字，目标: {target_chinese_chars} 汉字)，停止生成")
                 break
 
             # Check overall story completion
@@ -473,8 +511,10 @@ class NovelWritingPhases:
             print(f"   📊 整体进度评估: {story_evaluation['summary']}")
 
             # 检查是否需要继续或者达到长度限制
-            if not story_evaluation.get("is_continuing", False) or current_total_length >= total_expected_length:
-                print(f"   ✅ AI认为故事已达到合适的结束点或已达到长度限制")
+            import re
+            chinese_chars_count = len(re.findall(r'[\u4e00-\u9fff]', current_content))
+            if not story_evaluation.get("is_continuing", False) or chinese_chars_count >= 5000:
+                print(f"   ✅ AI认为故事已达到合适的结束点或已达到长度限制 ({chinese_chars_count} 中文汉字)")
                 break
 
         full_story = "\n\n".join(chapters)

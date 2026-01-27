@@ -9,36 +9,36 @@ OUTPUT_DIR = Path("output")
 # Agent 配置
 AGENT_CONFIGS = {
     "mythologist": {
-        "display_name": "🧙 神话学家",
-        "description": "分析故事背景和设定"
+        "display_name": "📜 跨文化符号策略师",
+        "description": "从全球神话、传说、象征中提取可操作的创作方向"
     },
     "writer": {
-        "display_name": "✍️  作家",
-        "description": "创作故事内容"
+        "display_name": "✍️  原创作家",
+        "description": "创作高质量的故事内容"
     },
     "dialogue_specialist": {
-        "display_name": "💬 对话专家",
-        "description": "优化对话质量"
+        "display_name": "💬 对话策略专家",
+        "description": "优化对话的生动性和角色辨识度"
     },
     "fact_checker": {
-        "display_name": "🔍 事实核查员",
-        "description": "检查逻辑和事实"
+        "display_name": "🏗️ 故事架构师",
+        "description": "确保逻辑自洽和设定一致，应用构建策略库"
     },
     "editor": {
-        "display_name": "📝 文学编辑",
-        "description": "评价整体质量"
+        "display_name": "🧐 整体审阅师",
+        "description": "提供综合质量评价和发布建议"
     },
     "documentation_specialist": {
-        "display_name": "📋 档案员",
-        "description": "维护故事一致性和人物档案"
+        "display_name": "📚 复杂度控制员",
+        "description": "维护故事连贯性，管理设定档案和人物发展"
     },
     "write_enviroment_specialist": {
-        "display_name": "🌆 描写专家",
-        "description": "优化环境和感官描写技巧"
+        "display_name": "🌆 感官呈现专家",
+        "description": "优化环境描写与氛围营造策略"
     },
     "write_rate_specialist": {
-        "display_name": "⏱️ 节奏专家",
-        "description": "优化叙事节奏和情绪曲线"
+        "display_name": "⏱️ 情绪节拍师",
+        "description": "设计叙事节奏和情绪起伏曲线"
     }
 }
 
@@ -47,25 +47,33 @@ GROUPCHAT_CONFIGS = {
     "research_phase": {
         "agents": ["mythologist", "writer"],
         "max_turns": 4,
-        "description": "创意研究和规划"
+        "description": "创意符号挖掘与大纲规划"
     },
     "review_phase": {
         "agents": ["fact_checker", "dialogue_specialist", "editor"],
         "max_turns": 5,
-        "description": "评审和修订"
+        "description": "架构审查与质量把控"
     },
-    "style_phase": {
+    "style_optimization": {
         "agents": ["write_enviroment_specialist", "write_rate_specialist", "dialogue_specialist"],
         "max_turns": 4,
-        "description": "风格优化和润色"
+        "description": "感官体验与节奏优化"
+    },
+    "consistency_phase": {
+        "agents": ["documentation_specialist", "fact_checker", "mythologist"],
+        "max_turns": 3,
+        "description": "连续性核查与符号一致性管理"
     }
 }
 
 # 创作配置
 CREATION_CONFIG = {
-    "num_chapters": 1,         # 总章数（减少为1章以控制长度）
-    "target_length_per_chapter": 2500,  # 每章目标字数（减少以控制token）
-    "total_target_length": 3000  # 总目标字数
+    "num_chapters": 1,         # 总章数（会动态增加直到达到目标字数）
+    "target_length_per_chapter": 3000,  # 每章基础字数目标
+    "total_target_length": 5000,  # 总目标字数（默认5000字，可调整）
+    "min_chinese_chars": 5000,  # 最少中文汉字数要求
+    "enable_dynamic_chapters": True,  # 是否启用动态多章节生成
+    "chapter_target_chars": 1800    # 每章目标汉字数
 }
 
 # 评分阈值
