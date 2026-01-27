@@ -38,7 +38,6 @@ try:
     from core.conversation_manager import ConversationManager
     from core.workflow_controller import WorkflowController
     from src.documentation_manager import DocumentationManager
-    from src.novel_phases_manager import NovelWritingPhases
     from phases import NovelWorkflowOrchestrator
     from utils import load_all_prompts
     from autogen_ext.models.openai import OpenAIChatCompletionClient

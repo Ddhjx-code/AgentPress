@@ -7,6 +7,19 @@ from config import AGENT_CONFIGS
 from utils import extract_content, extract_all_json
 import asyncio
 
+# 导入新的agent处理器
+from core.agent_handlers_map import AgentHandlersMap
+from src.agents import (
+    WriterAgentHandler,
+    MythologistAgentHandler,
+    DocumentationSpecialistHandler,
+    FactCheckerHandler,
+    DialogueSpecialistHandler,
+    EditorAgentHandler,
+    EnvironmentSpecialistHandler,
+    RhythmSpecialistHandler
+)
+
 
 class ModelConfig:
     """Configuration for different AI models per agent type"""
@@ -146,6 +159,47 @@ class AgentManager:
             print(f"⚠️ 暂不支持动态更新 {agent_key} 的系统消息")
             return False
         return False
+
+    def create_agent_handlers_map(self, documentation_manager=None) -> 'AgentHandlersMap':
+        """
+        创建Agent处理器映射，将每个agent映射到其专门处理器
+
+        Args:
+            documentation_manager: 用于文档专用代理的可选文档管理器
+
+        Returns:
+            AgentHandlersMap: 包含所有agent处理器映射的容器
+        """
+        if not self._initialized:
+            print("⚠️  代理管理器尚未初始化")
+            return None
+
+        from core.agent_handlers_map import AgentHandlersMap
+
+        handlers_map = AgentHandlersMap()
+
+        # 为每个agent创建专门处理器并注册到映射中
+        for agent_key, agent in self.agents.items():
+            # 根据agent_key创建对应的处理器
+            handlers_factory = {
+                "writer": lambda a: WriterAgentHandler(a),
+                "mythologist": lambda a: MythologistAgentHandler(a),
+                "documentation_specialist": lambda a: DocumentationSpecialistHandler(a, documentation_manager),
+                "fact_checker": lambda a: FactCheckerHandler(a),
+                "dialogue_specialist": lambda a: DialogueSpecialistHandler(a),
+                "editor": lambda a: EditorAgentHandler(a),
+                "write_enviroment_specialist": lambda a: EnvironmentSpecialistHandler(a),
+                "write_rate_specialist": lambda a: RhythmSpecialistHandler(a)
+            }
+
+            if agent_key in handlers_factory:
+                handler = handlers_factory[agent_key](agent)
+                handlers_map.register_handler(agent_key, handler)
+
+            # 同时注册原始agent对象
+            handlers_map.register_agent(agent_key, agent)
+
+        return handlers_map
 
     @staticmethod
     def _convert_to_valid_identifier(name: str) -> str:

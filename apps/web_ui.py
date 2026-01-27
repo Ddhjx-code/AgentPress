@@ -89,10 +89,9 @@ async def generate_novel(
             if hasattr(conv_manager, 'get_all_history'):
                 result["conversation_history"] = conv_manager.get_all_history()
 
-        # 如果workflow_service有novel_phases_manager，添加代理工作日志
-        if hasattr(workflow_service, 'novel_phases_manager') and workflow_service.novel_phases_manager:
-            if hasattr(workflow_service.novel_phases_manager, 'get_agent_work_summary'):
-                result["agent_work_log"] = workflow_service.novel_phases_manager.get_agent_work_summary()
+        # 如果workflow_service有代理处理器映射，可添加代理相关数据
+        if hasattr(workflow_service, 'agent_handlers_map') and workflow_service.agent_handlers_map:
+            result["agent_handlers_count"] = len(workflow_service.agent_handlers_map.list_handlers())
 
         return result
     except Exception as e:

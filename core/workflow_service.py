@@ -29,7 +29,11 @@ class WorkflowService:
         self.orchestrator = None
         self.conversation_manager = None
         self.prompts = {}
-        self.novel_phases_manager = None  # 添加对NovelWritingPhases的引用
+        # 初始化新阶段管理器
+        self.research_phase = None        # 研究阶段管理器
+        self.creation_phase = None        # 创作阶段管理器
+        self.review_phase = None          # 评审阶段管理器
+        self.final_check_phase = None     # 最终检查阶段管理器
 
     async def initialize_models(self, api_key: str, base_url: str = "https://apis.iflow.cn/v1", model_name: str = "qwen3-max"):
         """初始化模型"""
@@ -59,22 +63,34 @@ class WorkflowService:
         if not agent_init_success:
             raise Exception("代理初始化失败")
 
-        # 初始化编排器和小说阶段管理器（使用局部导入避免循环依赖）
+        # 初始化编排器与新的阶段管理器（使用局部导入避免循环依赖）
         from phases import NovelWorkflowOrchestrator
-        from src.novel_phases_manager import NovelWritingPhases
-        from src.conversation_manager import ConversationManager
+        from src.phases import ResearchPhase, CreationPhase, ReviewPhase, FinalCheckPhase
+        from core.agent_handlers_map import AgentHandlersMap
+        from core.conversation_manager import ConversationManager
         from src.documentation_manager import DocumentationManager
 
         self.orchestrator = NovelWorkflowOrchestrator()
         self.conversation_manager = ConversationManager() if not self.conversation_manager else self.conversation_manager
-        documentation_manager = DocumentationManager()
+        self.documentation_manager = DocumentationManager()
 
-        # 初始化小说阶段管理器
-        self.novel_phases_manager = NovelWritingPhases(
-            conversation_manager=self.conversation_manager,
-            documentation_manager=documentation_manager
-        )
-        self.novel_phases_manager.agents_manager = self.agent_manager
+        # 创建专门的代理处理器映射（新架构）
+        self.agent_handlers_map = self.agent_manager.create_agent_handlers_map(self.documentation_manager)
+
+        # 初始化新阶段管理器
+        self.research_phase = ResearchPhase(self.agent_handlers_map,
+                                          self.documentation_manager,
+                                          self.conversation_manager)
+        self.creation_phase = CreationPhase(self.agent_handlers_map,
+                                          self.documentation_manager,
+                                          self.conversation_manager)
+        self.review_phase = ReviewPhase(self.agent_handlers_map,
+                                      self.conversation_manager)
+        self.final_check_phase = FinalCheckPhase(self.agent_handlers_map,
+                                               self.conversation_manager)
+
+        # 如果orchestrator需要新架构的阶段管理器
+        self.orchestrator.agent_handlers_map = self.agent_handlers_map
 
         return True
 
@@ -85,29 +101,30 @@ class WorkflowService:
         """
         执行小说生成工作流
         """
-        if not self.agent_manager or not self.novel_phases_manager:
+        if not self.agent_manager or not hasattr(self, 'research_phase'):
             raise Exception("服务未初始化")
 
         try:
             # 设置进度回调以便实时更新
-            self.novel_phases_manager.progress_callback = self._on_progress_update
+            self.creation_phase.progress_callback = self._on_progress_update
+            self.review_phase.progress_callback = self._on_progress_update
 
-            # 使用小说阶段管理器执行完整工作流程
+            # 使用新阶段管理器执行完整工作流程
             # 第一阶段：研究和规划
             self._on_progress_update("创作流程", "phase1", "开始创意研究和规划")
-            research_data = await self.novel_phases_manager.async_phase1_research_and_planning(novel_concept)
+            research_data = await self.research_phase.execute_research(novel_concept)
 
             # 第二阶段：创作
             self._on_progress_update("创作流程", "phase2", "开始动态章节创作")
-            story = await self.novel_phases_manager.async_phase2_creation(research_data)
+            story = await self.creation_phase.execute_creation(research_data)
 
-            # 第三阶段：评审和修订（可选，基于配置）
+            # 第三阶段：评审和修订
             self._on_progress_update("创作流程", "phase3", "开始评审和修订")
-            refined_story = await self.novel_phases_manager.phase3_review_refinement(story)
+            refined_story = await self.review_phase.execute_review(story)
 
             # 第四阶段：最终检查
             self._on_progress_update("创作流程", "phase4", "执行最终检查")
-            final_story = await self.novel_phases_manager.phase4_final_check(refined_story)
+            final_story = await self.final_check_phase.execute_final_check(refined_story)
 
             self._on_progress_update("创作流程", "complete", "创作完成")
 
@@ -118,10 +135,6 @@ class WorkflowService:
                 "final_story": final_story,
                 "story_length": len(final_story)
             }
-
-            # 添加代理工作日志（如果存在）
-            if hasattr(self.novel_phases_manager, 'get_agent_work_summary'):
-                result["agent_work_log"] = self.novel_phases_manager.get_agent_work_summary()
 
             # 添加对话历史
             result["conversation_history"] = self.get_conversation_history()

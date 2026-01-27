@@ -331,3 +331,47 @@ class ConversationManager:
                     f.write("\n")
 
             print(f"📋 阶段中间摘要已保存到: {txt_filename}")
+    def add_research_summary(self, stage: str, research_summary: Dict[str, Any]):
+        """添加研究阶段摘要"""
+        self.phase_summaries.append({
+            "stage": stage,
+            "type": "research",
+            "timestamp": datetime.now().isoformat(),
+            "summary": research_summary,
+            "content_length": len(research_summary.get('outline', '')) if 'outline' in research_summary else 0
+        })
+
+    def add_review_summary(self, review_summary: Dict[str, Any]):
+        """添加评审阶段摘要"""
+        self.phase_summaries.append({
+            "stage": "review",
+            "type": "review",
+            "timestamp": datetime.now().isoformat(),
+            "summary": review_summary,
+            "initial_length": review_summary.get('initial_length', 0),
+            "final_length": review_summary.get('final_length', 0),
+            "revision_rounds": review_summary.get('revision_rounds', 0),
+            "final_score": review_summary.get('final_score', 0)
+        })
+
+    def add_final_check_report(self, check_report: Dict[str, Any]):
+        """添加最终检查报告"""
+        self.phase_summaries.append({
+            "stage": "final_check",
+            "type": "final_check",
+            "timestamp": datetime.now().isoformat(),
+            "report": check_report,
+            "original_length": check_report.get('original_length', 0),
+            "final_length": check_report.get('final_length', 0)
+        })
+
+    def add_optimization_note(self, optimization_summary: Dict[str, Any]):
+        """添加优化说明"""
+        # 将优化说明添加到反馈记录中
+        self.feedback_records.append({
+            "type": "optimization",
+            "timestamp": datetime.now().isoformat(),
+            "summary": optimization_summary,
+            "original_length": optimization_summary.get('original_length', 0),
+            "optimized_length": optimization_summary.get('optimized_length', 0)
+        })

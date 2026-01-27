@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 生成大于5000字的长篇故事
+重构版：使用新的架构和专业处理器
 """
 import asyncio
 import sys
@@ -12,10 +13,11 @@ project_path = Path(__file__).parent
 sys.path.insert(0, str(project_path))
 
 from config import CREATION_CONFIG
-from src.novel_phases_manager import NovelWritingPhases
 from core.agent_manager import AgentManager
 from core.conversation_manager import ConversationManager
 from src.documentation_manager import DocumentationManager
+from core.agent_handlers_map import AgentHandlersMap
+from src.phases import ResearchPhase, CreationPhase, ReviewPhase, FinalCheckPhase
 from utils import load_all_prompts
 from autogen_ext.models.openai import OpenAIChatCompletionClient
 
@@ -77,9 +79,19 @@ async def generate_long_story():
     conversation_manager = ConversationManager()
     documentation_manager = DocumentationManager()
 
-    # 创建创作流程
-    novel_phases = NovelWritingPhases(conversation_manager, documentation_manager)
-    novel_phases.agents_manager = agent_manager
+    # 创建专门代理处理器映射
+    agent_handlers_map = agent_manager.create_agent_handlers_map(documentation_manager)
+    if not agent_handlers_map:
+        print("❌ 代理处理器映射创建失败")
+        return
+
+    print(f"✅ 代理处理器映射创建完成，共有 {len(agent_handlers_map.list_handlers())} 个处理器")
+
+    # 创建新的阶段管理器（使用重构后的版本）
+    research_phase = ResearchPhase(agent_handlers_map, documentation_manager, conversation_manager)
+    creation_phase = CreationPhase(agent_handlers_map, documentation_manager, conversation_manager)
+    review_phase = ReviewPhase(agent_handlers_map, conversation_manager)
+    final_check_phase = FinalCheckPhase(agent_handlers_map, conversation_manager)
 
     # 读取测试概念
     with open("test_concept.txt", 'r', encoding='utf-8') as f:
@@ -88,15 +100,26 @@ async def generate_long_story():
     print(f"📚 使用概念: {concept[:100]}...")
 
     print("🔍 开始第一阶段：研究和规划...")
-    research_data = await novel_phases.async_phase1_research_and_planning(concept)
+    research_data = await research_phase.execute_research(concept)
 
     print("✍️ 开始第二阶段：生成大于5000字的长篇故事...")
-    long_story = await novel_phases.async_phase2_creation(research_data)
+    # 设置进度回调
+    async def progress_callback(phase, step, message, progress):
+        print(f"[PROGRESS] {phase} - {step}: {message}")
+    creation_phase.progress_callback = progress_callback
+    long_story = await creation_phase.execute_creation(research_data)
+
+    print("🧐 开始第三阶段：评审和修订...")
+    review_phase.progress_callback = progress_callback
+    revised_story = await review_phase.execute_review(long_story)
+
+    print("✅ 开始第四阶段：最终检查...")
+    final_story = await final_check_phase.execute_final_check(revised_story)
 
     # 计算中文汉字数量，这更符合用户关心的指标
     import re
-    chinese_chars_count = len(re.findall(r'[\\u4e00-\\u9fff]', long_story))
-    print(f"✅ 生成的长篇故事长度: {len(long_story)} 总字符 | {chinese_chars_count} 中文汉字")
+    chinese_chars_count = len(re.findall(r'[\\u4e00-\\u9fff]', final_story))
+    print(f"✅ 生成的长篇故事长度: {len(final_story)} 总字符 | {chinese_chars_count} 中文汉字")
 
     # 保存生成的故事
     output_dir = Path("output")
