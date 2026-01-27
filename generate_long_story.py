@@ -93,7 +93,10 @@ async def generate_long_story():
     print("✍️ 开始第二阶段：生成大于5000字的长篇故事...")
     long_story = await novel_phases.async_phase2_creation(research_data)
 
-    print(f"✅ 生成的长篇故事长度: {len(long_story)} 字符")
+    # 计算中文汉字数量，这更符合用户关心的指标
+    import re
+    chinese_chars_count = len(re.findall(r'[\\u4e00-\\u9fff]', long_story))
+    print(f"✅ 生成的长篇故事长度: {len(long_story)} 总字符 | {chinese_chars_count} 中文汉字")
 
     # 保存生成的故事
     output_dir = Path("output")
@@ -104,6 +107,26 @@ async def generate_long_story():
         f.write(long_story)
 
     print(f"💾 长篇故事已保存: {story_file}")
+
+    # 生成过程可视化报告
+    if hasattr(conversation_manager, 'print_meeting_minutes_summary'):
+        print("\n" + "="*70)
+        print("📋 长篇故事生成过程AI代理协作总结")
+        print("="*70)
+        conversation_manager.print_meeting_minutes_summary()
+
+        # 保存会议纪要到文件
+        conversation_manager.save_meeting_minutes_to_file()
+
+        # 使用ProcessVisualizer进行高级可视化分析
+        try:
+            from src.process_visualizer import ProcessVisualizer
+            visualizer = ProcessVisualizer()
+            visualizer.visualize_meeting_minutes(conversation_manager, "file")
+            visualizer.visualize_detailed_participants(conversation_manager, "file")
+            visualizer.save_complete_process_log(conversation_manager)
+        except Exception as e:
+            print(f"⚠️  扩展可视化失败: {e}")
 
     # 同时保存完整的代理工作日志
     if hasattr(novel_phases, 'agent_work_log'):
