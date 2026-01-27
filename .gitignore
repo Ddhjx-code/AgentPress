@@ -71,3 +71,21 @@ novel_data.json
 novel_story.txt
 final_output.json
 *.pdf
+
+# PyInstaller build artifacts
+# Exclude temporary PyInstaller files but keep configuration
+build_temp/
+*.spec
+!final_agentpress.spec
+!pyi_rth_addpath.py
+build.sh
+final_build.sh
+cli.spec
+build_spec.py
+build_spec.spec
+agentpress.spec
+cli_for_packaging.py
+cli_for_packaging.spec
+
+# PyInstaller cached files
+*/__pycache__/pyimod02_importers.*

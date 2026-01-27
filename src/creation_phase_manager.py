@@ -4,7 +4,7 @@ from typing import Dict, List, Any
 from datetime import datetime
 from core.agent_manager import AgentManager
 from core.conversation_manager import ConversationManager
-from core.documentation_manager import DocumentationManager
+from src.documentation_manager import DocumentationManager
 from core.chapter_decision_engine import ChapterDecisionEngine
 from core.continuity_manager import ContinuityManager
 from core.story_state_manager import StoryStateManager
