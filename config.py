@@ -69,11 +69,11 @@ GROUPCHAT_CONFIGS = {
 # 创作配置
 CREATION_CONFIG = {
     "num_chapters": 1,         # 总章数（会动态增加直到达到目标字数）
-    "target_length_per_chapter": 3000,  # 每章基础字数目标
-    "total_target_length": 5000,  # 总目标字数（默认5000字，可调整）
-    "min_chinese_chars": 5000,  # 最少中文汉字数要求
+    "target_length_per_chapter": 7000,  # 每章基础字数目标
+    "total_target_length": 55000,  # 总目标字数
+    "min_chinese_chars": 50000,  # 最少中文汉字数要求
     "enable_dynamic_chapters": True,  # 是否启用动态多章节生成
-    "chapter_target_chars": 1800    # 每章目标汉字数
+    "chapter_target_chars": 5000    # 每章目标汉字数
 }
 
 # 评分阈值

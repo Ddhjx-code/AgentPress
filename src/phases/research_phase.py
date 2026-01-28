@@ -32,12 +32,14 @@ class ResearchPhase:
         self.doc_manager = documentation_manager
         self.conversation_manager = conversation_manager
 
-    async def execute_research(self, novel_concept: str) -> Dict[str, Any]:
+    async def execute_research(self, novel_concept: str, previous_context: str = "", previous_documentation: Dict = None) -> Dict[str, Any]:
         """
         执行完整的创意研究和规划阶段
 
         Args:
             novel_concept: 小说创意概念
+            previous_context: 之前的续写上下文（用于长篇小说续写）
+            previous_documentation: 之前的文档数据（用于保持一致性）
 
         Returns:
             包含研究和规划结果的字典
@@ -46,17 +48,52 @@ class ResearchPhase:
         print("🔍 第一阶段：创意研究与规划")
         print("="*60)
 
+        # 如果有之前的上下文，通知用户
+        if previous_context:
+            print(f"📚 检测到续写模式，已加载之前章节内容作为上下文参考")
+            if previous_documentation:
+                print(f"📝 已加载之前的故事文档，将用于保持一致性")
+
+        # 处理上下文：如果续写，合并概念与上下文和其他文档信息
+        full_context = novel_concept
+
+        if previous_context:
+            # 从previous_documentation提取结构化信息
+            documentation_summary = ""
+            if previous_documentation and isinstance(previous_documentation, dict):
+                documentation_summary += "## 文档摘要供参考：\n"
+
+                # 添加角色信息
+                if "characters" in previous_documentation and previous_documentation["characters"]:
+                    characters = list(previous_documentation["characters"].keys())
+                    if characters:
+                        documentation_summary += f"角色列表：{', '.join(characters[:10])}{'...' if len(characters) > 10 else ''}\n"
+
+                # 添加世界设定
+                if "world_rules" in previous_documentation and previous_documentation["world_rules"]:
+                    rules = list(previous_documentation["world_rules"].keys())
+                    documentation_summary += f"世界规则：{', '.join(rules[:10])}{'...' if len(rules) > 10 else ''}\n"
+
+                # 添加重要地点
+                if "settings_locations" in previous_documentation and previous_documentation["settings_locations"]:
+                    locations = list(previous_documentation["settings_locations"].keys())
+                    documentation_summary += f"重要地点：{', '.join(locations[:10])}{'...' if len(locations) > 10 else ''}\n"
+
+                documentation_summary += "\n"
+
+            full_context = f"## 续写模式 - 已有上下文:\n{previous_context}\n\n{documentation_summary}## 新的续写要求:\n{novel_concept}\n\n请基于已有内容和设定继续创作，并保持风格、人物和设定的一致性。重要的是要注意角色发展和情节连贯性。"
+
         # 1. 执行跨文化符号策略分析 (Mythologist)
         print("\\n📖 开始跨文化符号策略分析...")
         mythologist_handler = self.agent_handlers_map.get_handler("mythologist")
         if mythologist_handler:
-            mythologist_result = await mythologist_handler.process(novel_concept)
+            mythologist_result = await mythologist_handler.process(full_context)
             symbol_analysis = mythologist_result.get("parsed_json", {})
         else:
             symbol_analysis = {}
             print("⚠️  Mythologist代理不可用")
 
-        # 2. 使用Writer代理生成初步大纲 - 同时考虑字数要求
+        # 2. 使用Writer代理生成初步大纲 - 同时考虑字数要求和上下文
         writer_handler = self.agent_handlers_map.get_handler("writer")
         if writer_handler:
             print("📋 生成初步大纲...")
@@ -94,7 +131,30 @@ class ResearchPhase:
                     specified_target = int(more_match.group(1))
                     print(f"📊 检测到概念中的最低字数要求: {specified_target} 字（以上）")
 
-            outline_task = f"""基于以下创意概念提供初步的创作大纲：
+            # 创建针对续写的任务描述
+            if previous_context:
+                outline_task = f"""您正在续写一部小说。以下是有用的参考信息：
+
+## 之前的创作内容（请保持一致性）：
+{previous_context}
+
+## 新的续写要求：
+{novel_concept}
+
+请基于已有内容继续创作，并保持以下方面的一致性：
+1. 人物性格和关系
+2. 世界观和规则
+3. 写作风格和语调
+4. 情节连贯性
+
+同时请完成以下任务：
+1. 核心冲突和情节主线（延续之前的故事线）
+2. 主要角色设定（使用已有角色）
+3. 本部分章节结构规划
+4. 预期风格和基调的延续
+5. 与前面内容的衔接点"""
+            else:
+                outline_task = f"""基于以下创意概念提供初步的创作大纲：
 
 创意概念: {novel_concept}
 

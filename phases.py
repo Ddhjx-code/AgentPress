@@ -1,3 +1,4 @@
+from typing import Dict
 from core.agent_handlers_map import AgentHandlersMap
 from core.conversation_manager import ConversationManager
 from src.documentation_manager import DocumentationManager
@@ -20,7 +21,8 @@ class NovelWorkflowOrchestrator:
 
     async def run_async_workflow(self, initial_idea: str, multi_chapter: bool = False,
                                 total_chapters: int = 1, agent_handlers_map=None, progress_callback=None,
-                                enable_manual_control: bool = False):
+                                enable_manual_control: bool = False, previous_context: str = "",
+                                previous_documentation: Dict = None, start_chapter_num: int = 1):
         """Run the complete async workflow with proper agent handler coordination"""
         # 使用新的处理器映射架构
         if agent_handlers_map:
@@ -43,11 +45,11 @@ class NovelWorkflowOrchestrator:
             # Step 1: Research and Planning - 使用新的重构实现
             if enable_manual_control:
                 research_data = await self.workflow_controller.wrap_async_generation(
-                    lambda: research_phase.execute_research(initial_idea),
+                    lambda: research_phase.execute_research(initial_idea, previous_context, previous_documentation),
                     "research", "研究和规划", pause_on_completion=True
                 )
             else:
-                research_data = await research_phase.execute_research(initial_idea)
+                research_data = await research_phase.execute_research(initial_idea, previous_context, previous_documentation)
 
             self.workflow_controller.set_result("research_data", research_data)
 

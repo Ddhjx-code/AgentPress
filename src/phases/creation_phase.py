@@ -75,6 +75,9 @@ class CreationPhase:
         Returns:
             完整的故事内容
         """
+        # 初始化章节评估记录
+        chapter_evaluations = {}
+
         # 初始化必要的处理器
         writer_handler = self.agent_handlers_map.get_handler("writer")
         if not writer_handler:
@@ -129,6 +132,9 @@ class CreationPhase:
             target_length = target_total_chars
 
         print(f"📏 故事进度追踪 [ 0% ] (目标: {target_chinese_chars} 汉字)")
+
+        # 初始化章节评估记录
+        chapter_evaluations = {}
 
         while True:  # 继续直到AI决定停止
             chapter_count += 1
@@ -193,6 +199,38 @@ class CreationPhase:
                 research_data
             )
             print(" 完成!")
+
+            # 使用Editor进行单章节评审（利用其精细的章节评估能力）
+            editor_handler = self.agent_handlers_map.get_handler("editor")
+            if editor_handler:
+                print(f"🔍 Editor正在进行单章节评估...", end="", flush=True)
+                try:
+                    # 使用Editor的单章评审功能
+                    chapter_evaluation = await editor_handler.evaluate_content(new_content)
+
+                    # 保存章节评审结果
+                    if "chapter_evaluations" not in locals():
+                        chapter_evaluations = {}
+                    chapter_evaluations[chapter_count] = chapter_evaluation.get("comprehensive_evaluation", {})
+
+                    # 检查是否有需要立即处理的技巧缺口
+                    evaluation_data = chapter_evaluation.get("comprehensive_evaluation", {})
+                    if isinstance(evaluation_data, dict) and "reader_experience" in evaluation_data:
+                        reader_exp = evaluation_data["reader_experience"]
+                        engagement_level = reader_exp.get("engagement_level", "medium")
+                        drop_off_risk = reader_exp.get("drop_off_risk", "medium")
+
+                        if drop_off_risk.lower() == "high" or engagement_level.lower() == "low":
+                            print(f" ⚠️ 检测到第{chapter_count}章可能影响阅读体验")
+                            # 这里可以考虑实现基于Editor评审的章节优化
+                            if "actionable_suggestions" in evaluation_data:
+                                print(f"   📝 Editor建议: {len(evaluation_data['actionable_suggestions'])} 项优化")
+                    print(" 完成!")
+                except Exception as e:
+                    print(f" 跳过 (错误: {str(e)})")
+                    pass
+            else:
+                print(f"📝 Editor代理不可用，跳过单章节评审")
 
             # 从决策中更新章节标题
             suggested_title = chapter_decision.get("suggested_title", f"第{chapter_count}章")
@@ -389,6 +427,21 @@ class CreationPhase:
             # 创建摘要
             creation_summary = f"动态章节创作结束，共生成 {chapter_count} 个章节，总长度 {final_chinese_chars} 汉字，目标 {target_chinese_chars} 汉字"
 
+            # 添加章节评审总结
+            eval_summary_parts = []
+            if 'chapter_evaluations' in locals() and chapter_evaluations:
+                high_risk_chapters = []
+                for ch_num, eval_data in chapter_evaluations.items():
+                    if isinstance(eval_data, dict) and "reader_experience" in eval_data:
+                        reader_exp = eval_data["reader_experience"]
+                        if reader_exp.get("drop_off_risk", "").lower() == "high" or reader_exp.get("engagement_level", "").lower() == "low":
+                            high_risk_chapters.append(str(ch_num))
+
+                if high_risk_chapters:
+                    eval_summary_parts.append(f"高风险章节: {', '.join(high_risk_chapters)}")
+
+            eval_summary = "; ".join(eval_summary_parts) if eval_summary_parts else "无特别风险章节"
+
             self.conversation_manager.add_meeting_minutes(
                 stage="creation_phase",
                 participants=active_handlers,
@@ -397,7 +450,8 @@ class CreationPhase:
                     f"生成章节: {chapter_count} 章",
                     f"总汉字数: {final_chinese_chars} 汉字",
                     f"目标达成: {'是' if final_chinese_chars >= target_chinese_chars else '否'}",
-                    f"AI驱动决策: {'已启用' if CREATION_CONFIG.get('enable_dynamic_chapters', True) else '未启用'}"
+                    f"AI驱动决策: {'已启用' if CREATION_CONFIG.get('enable_dynamic_chapters', True) else '未启用'}",
+                    f"章节评审: {eval_summary}"
                 ],
                 turn_count=chapter_count  # 每章一轮
             )

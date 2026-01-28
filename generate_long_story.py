@@ -78,7 +78,28 @@ async def generate_long_story():
 
     # 创建其他必要组件
     conversation_manager = ConversationManager()
-    documentation_manager = DocumentationManager()
+
+    # 尝试从概念中提取标题以生成独立文档文件
+    import re
+    from datetime import datetime
+    title_match = re.search(r'^(?:《(.+?)》|标题[:：]\s*(.+)|故事[:：]\s*(.+)|[^#\n]*#类型[:：].*?\n(.+?)\s*$)', concept, re.MULTILINE)
+    story_title = None
+    if title_match:
+        story_title = next((x for x in title_match.groups() if x is not None), None)
+
+    # 如果无法从概念中提取标题，使用概念的前几个字符
+    if not story_title and len(concept) > 0:
+        # 清理概念文字提取标题
+        clean_concept = re.sub(r'^[#*.\s\n\r]+|[*#\s\n\r]+$', '', concept).strip()
+        if clean_concept:
+            story_title = clean_concept.split('\n')[0][:50]  # 使用第一行，限制50个字符
+        else:
+            story_title = f"UntitledStory_{int(datetime.now().timestamp())}"
+    else:
+        story_title = f"Story_{int(datetime.now().timestamp())}" if not story_title else story_title
+
+    # 创建文档管理器，使用故事标题生成独立的文档文件
+    documentation_manager = DocumentationManager(story_title=story_title)
 
     # 创建专门代理处理器映射
     agent_handlers_map = agent_manager.create_agent_handlers_map(documentation_manager)
@@ -138,11 +159,29 @@ async def generate_long_story():
     report = proofreader.generate_proofreading_report(results.get('draft_story', ''), final_story)
     print(f"📈 校对优化报告: 修正了 {report.get('length_difference', 0)} 处格式问题")
 
-    # 保存生成的故事
-    output_dir = Path("output")
-    output_dir.mkdir(exist_ok=True)
+    # 尝试从故事内容中提取标题作为文件名的一部分
+    import re
+    title_match = re.search(r'^\s*#+\s*(.+)$|^(?:Title|标题|故事标题):\s*(.+)$|^《(.+?)》', long_story, re.MULTILINE | re.IGNORECASE)
+    if title_match:
+        # 获取匹配的标题
+        title = next((x for x in title_match.groups() if x is not None), None)
+        if title:
+            # 清理标题以确保它适合用作文件名
+            clean_title = re.sub(r'[<>:"/\\|?*]', '_', title.strip()[:50])  # 限制长度并替换非法字符
+            clean_title = re.sub(r'\s+', '_', clean_title)  # 将空格替换为下划线
+        else:
+            clean_title = f"story_{len(long_story)}"
+    else:
+        clean_title = f"story_{len(long_story)}"
 
-    story_file = output_dir / "long_story_6000_chars.txt"
+    # 检测内容类型并选择合适的扩展名
+    has_markdown = bool(re.search(r'(^#{1,6}\s|\*{1,3}[^*\n]+\*{1,3}|_{1,3}[^_\n]+_{1,3}|^-{3,}|^\|\s|```)', long_story, re.MULTILINE))
+
+    if has_markdown:
+        story_file = output_dir / f"{clean_title}.md"  # 使用markdown扩展名
+    else:
+        story_file = output_dir / f"{clean_title}.txt"  # 使用txt扩展名
+
     with open(story_file, 'w', encoding='utf-8') as f:
         f.write(long_story)
 

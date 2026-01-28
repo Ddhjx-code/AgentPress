@@ -161,6 +161,12 @@ class ConversationManager:
 
     def get_summary(self) -> Dict[str, Any]:
         """获取会话摘要"""
+        # 只对包含avg_score字段的记录计算平均分
+        valid_avg_scores = []
+        for r in self.feedback_records:
+            if "avg_score" in r:
+                valid_avg_scores.append(r["avg_score"])
+
         return {
             "total_conversations": len(self.conversation_history),
             "total_versions": len(self.story_versions),
@@ -168,7 +174,7 @@ class ConversationManager:
             "total_documentation_records": len(self.documentation_records),  # ✅ 新增
             "total_meeting_minutes": len(self.meeting_minutes),  # 会议纪要总数
             "total_phase_summaries": len(self.phase_summaries),  # 阶段总结总数
-            "avg_scores": [r["avg_score"] for r in self.feedback_records],
+            "avg_scores": valid_avg_scores,
             "meeting_participants": list(set(
                 agent for meeting in self.meeting_minutes
                 for agent in meeting["participants"]
@@ -367,11 +373,13 @@ class ConversationManager:
 
     def add_optimization_note(self, optimization_summary: Dict[str, Any]):
         """添加优化说明"""
-        # 将优化说明添加到反馈记录中
+        # 将优化说明添加到反馈记录中，并包含必要的结构保持兼容性
         self.feedback_records.append({
             "type": "optimization",
             "timestamp": datetime.now().isoformat(),
             "summary": optimization_summary,
             "original_length": optimization_summary.get('original_length', 0),
-            "optimized_length": optimization_summary.get('optimized_length', 0)
+            "optimized_length": optimization_summary.get('optimized_length', 0),
+            "avg_score": 0.0,  # 空的平均分，避免KeyError
+            "valid_scores_count": 0
         })

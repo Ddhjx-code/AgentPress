@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Dict, Any
 from typing import TYPE_CHECKING
 import json
+from datetime import datetime
 
 # 添加项目路径（将当前目录添加到Python路径的前面）
 project_path = Path(__file__).parent
@@ -64,6 +65,7 @@ try:
     from autogen_ext.models.openai import OpenAIChatCompletionClient
     from autogen_core.models import ModelInfo, ModelFamily
     from src.text_proofreader import TextProofreader
+    from src.continuation_manager import ContinuationManager
 except ImportError as e:
     print(f"导入模块失败: {e}")
     print("当前搜索路径:", sys.path)
@@ -101,6 +103,10 @@ def create_argument_parser():
     generate_parser.add_argument('--model-base-url', help='模型API基础URL')
     generate_parser.add_argument('--config-file', help='配置文件路径')
     generate_parser.add_argument('--prompts-dir', default='prompts', help='提示词目录路径')
+
+    # 续写相关参数
+    generate_parser.add_argument('--project-name', help='项目名称（用于识别续写项目）')
+    generate_parser.add_argument('--continue-from', help='续写项目ID或文件路径（从之前的章节继续）')
 
     # info 子命令
     info_parser = subparsers.add_parser('info', help='显示系统信息')
@@ -218,12 +224,6 @@ def run_generate_command(args: argparse.Namespace):
 
         print("✅ 代理管理器初始化成功")
 
-        # 创建文档管理器
-        documentation_manager = DocumentationManager()
-
-        # 创建工作流协调器
-        orchestrator = NovelWorkflowOrchestrator()
-
         # 加载故事概念
         try:
             concept = load_story_concept(args.concept)
@@ -231,6 +231,30 @@ def run_generate_command(args: argparse.Namespace):
         except ValueError as e:
             print(f"❌ {e}")
             return
+
+        # 尝试从概念中提取标题来生成唯一的文档文件名
+        import re
+        title_match = re.search(r'^(?:《(.+?)》|标题[:：]\s*(.+)|故事[:：]\s*(.+)|[^#\n]*#类型[:：].*?\n(.+?)\s*$)', concept, re.MULTILINE)
+        story_title = None
+        if title_match:
+            story_title = next((x for x in title_match.groups() if x is not None), None)
+
+        # 如果无法从概念中提取标题，使用概念的前几个字符
+        if not story_title and len(concept) > 0:
+            # 清理概念文字提取标题
+            clean_concept = re.sub(r'^[#*.\s\n\r]+|[*#\s\n\r]+$', '', concept).strip()
+            if clean_concept:
+                story_title = clean_concept.split('\n')[0][:50]  # 使用第一行，限制50个字符
+            else:
+                story_title = f"UntitledStory_{int(datetime.now().timestamp())}"
+        else:
+            story_title = f"Story_{int(datetime.now().timestamp())}" if not story_title else story_title
+
+        # 创建文档管理器，使用故事标题生成独立的文档文件
+        documentation_manager = DocumentationManager(story_title=story_title)
+
+        # 创建工作流协调器
+        orchestrator = NovelWorkflowOrchestrator()
 
         # 异步回调函数，用于进度更新和会议纪要输出
         async def progress_callback(phase, step, message, progress=None):
@@ -278,8 +302,29 @@ def run_generate_command(args: argparse.Namespace):
             output_dir = Path("output")
             output_dir.mkdir(exist_ok=True)
 
-            # 保存最终故事
-            story_file = output_dir / f"generated_story_{len(corrected_final_story)}.txt"
+            # 尝试从故事内容中提取标题作为文件名的一部分
+            import re
+            title_match = re.search(r'^\s*#+\s*(.+)$|^(?:Title|标题|故事标题):\s*(.+)$|^《(.+?)》', corrected_final_story, re.MULTILINE | re.IGNORECASE)
+            if title_match:
+                # 获取匹配的标题
+                title = next((x for x in title_match.groups() if x is not None), None)
+                if title:
+                    # 清理标题以确保它适合用作文件名
+                    clean_title = re.sub(r'[<>:"/\\|?*]', '_', title.strip()[:50])  # 限制长度并替换非法字符
+                    clean_title = re.sub(r'\s+', '_', clean_title)  # 将空格替换为下划线
+                else:
+                    clean_title = f"story_{len(corrected_final_story)}"
+            else:
+                clean_title = f"story_{len(corrected_final_story)}"
+
+            # 检测内容类型并选择合适的扩展名
+            has_markdown = bool(re.search(r'(^#{1,6}\s|\*{1,3}[^*\n]+\*{1,3}|_{1,3}[^_\n]+_{1,3}|^-{3,}|^\|\s|```)', corrected_final_story, re.MULTILINE))
+
+            if has_markdown:
+                story_file = output_dir / f"{clean_title}.md"  # 使用markdown扩展名
+            else:
+                story_file = output_dir / f"{clean_title}.txt"  # 使用txt扩展名
+
             with open(story_file, 'w', encoding='utf-8') as f:
                 f.write(corrected_final_story)
 
