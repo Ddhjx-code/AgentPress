@@ -261,8 +261,11 @@ class CreationPhase:
                     rate_optimization = await self._optimize_rhythm(new_content, chapter_info, rate_handler)
                 print(" 完成!")
 
-            # 计算中文汉字的实际数量（更符合用户直觉的指标）
-            chinese_chars_count = len(re.findall(r'[\\u4e00-\\u9fff]', current_content))
+            # 计算中文字符的实际数量（更符合用户直觉的指标，包含扩展中文字符）
+            import re
+            # 匹配更广范围的中文字符，包括基本汉字、扩展A、B、C、D区以及中文标点符号
+            chinese_pattern = r'[\u4e00-\u9fff\u3400-\u4dbf\U00020000-\U0002a6df\U0002a700-\U0002b73f\U0002b740-\U0002b81f\U0002b820-\U0002ceaf\uf900-\ufaff\u3000-\u303f\uff00-\uffef]'
+            chinese_chars_count = len(re.findall(chinese_pattern, current_content))
 
             # 获取目标汉字数 - 优先使用min_chinese_chars，如果未设置则使用total_target_length
             target_chinese_chars = CREATION_CONFIG.get("min_chinese_chars", CREATION_CONFIG.get("total_target_length", 5000))
@@ -280,8 +283,11 @@ class CreationPhase:
                     chinese_progress / 100.0  # 使用汉字进度作为主要指标
                 )
 
-            # 计算中文汉字的实际数量
-            chinese_chars_count = len(re.findall(r'[\\u4e00-\\u9fff]', current_content))
+            # 计算中文字符的实际数量
+            import re
+            # 匹配更广范围的中文字符，包括基本汉字、扩展A、B、C、D区以及中文标点符号
+            chinese_pattern = r'[\u4e00-\u9fff\u3400-\u4dbf\U00020000-\U0002a6df\U0002a700-\U0002b73f\U0002b740-\U0002b81f\U0002b820-\U0002ceaf\uf900-\ufaff\u3000-\u303f\uff00-\uffef]'
+            chinese_chars_count = len(re.findall(chinese_pattern, current_content))
 
             # 获取目标汉字数
             target_chinese_chars = CREATION_CONFIG.get("min_chinese_chars", 5000)
@@ -318,18 +324,24 @@ class CreationPhase:
             if not story_evaluation.get("is_continuing", False) or chinese_chars_count >= 5000:
                 print(f"   ✅ AI认为故事已达到合适的结束点或已达到长度限制 ({chinese_chars_count} 中文汉字)")
                 if self.progress_callback:
+                    # 使用实际目标汉字数来计算进度，而不是固定5000
+                    target_chinese_chars = CREATION_CONFIG.get("min_chinese_chars", CREATION_CONFIG.get("total_target_length", 5000))
+                    actual_progress = min(1.0, chinese_chars_count/max(target_chinese_chars, 1))  # 确保分母不为0
                     await self.progress_callback(
                         "章节创作",
                         "AI评估结束",
-                        f"AI认为已达到合适的结束点，共 {chinese_chars_count} 中文汉字",
-                        min(1.0, chinese_chars_count/5000.0)  # 进度不能超过100%
+                        f"AI认为已达到合适的结束点，共 {chinese_chars_count} 中文汉字 (目标: {target_chinese_chars})",
+                        actual_progress
                     )
                 break
 
         full_story = "\\n\\n".join(chapters)
 
         # 使用汉字数计算最终进度，更符合用户直觉
-        final_chinese_chars = len(re.findall(r'[\\u4e00-\\u9fff]', full_story))
+        import re
+        # 匹配更广范围的中文字符，包括基本汉字、扩展A、B、C、D区以及中文标点符号
+        chinese_pattern = r'[\u4e00-\u9fff\u3400-\u4dbf\U00020000-\U0002a6df\U0002a700-\U0002b73f\U0002b740-\U0002b81f\U0002b820-\U0002ceaf\uf900-\ufaff\u3000-\u303f\uff00-\uffef]'
+        final_chinese_chars = len(re.findall(chinese_pattern, full_story))
         target_chinese_chars = CREATION_CONFIG.get("min_chinese_chars", CREATION_CONFIG.get("total_target_length", 5000))
         final_progress = min(100, int(final_chinese_chars / target_chinese_chars * 100))
 
@@ -340,11 +352,14 @@ class CreationPhase:
 
         # 通知进度回调 - 最终完成
         if self.progress_callback:
+            # 计算实际进度百分比，避免总是显示100%
+            target_chinese_chars = CREATION_CONFIG.get("min_chinese_chars", CREATION_CONFIG.get("total_target_length", 5000))
+            final_progress = min(1.0, final_chinese_chars/max(target_chinese_chars, 1))  # 确保分母不为0
             await self.progress_callback(
                 "章节创作",
                 "创作完成",
-                f"动态章节创作完成，共 {chapter_count} 章节，{final_chinese_chars} 中文汉字",
-                1.0
+                f"动态章节创作完成，共 {chapter_count} 章节，{final_chinese_chars} 中文汉字 (目标: {target_chinese_chars})",
+                final_progress  # 使用实际进度而不是恒定的1.0
             )
 
         # 添加创作阶段的会议纪要
@@ -365,7 +380,10 @@ class CreationPhase:
                 active_handlers.append("continuity_manager")
 
             # 使用汉字数而非总字符数来创建更准确的摘要
-            final_chinese_chars = len(re.findall(r'[\\u4e00-\\u9fff]', full_story))
+            import re
+            # 匹配更广范围的中文字符，包括基本汉字、扩展A、B、C、D区以及中文标点符号
+            chinese_pattern = r'[\u4e00-\u9fff\u3400-\u4dbf\U00020000-\U0002a6df\U0002a700-\U0002b73f\U0002b740-\U0002b81f\U0002b820-\U0002ceaf\uf900-\ufaff\u3000-\u303f\uff00-\uffef]'
+            final_chinese_chars = len(re.findall(chinese_pattern, full_story))
             target_chinese_chars = CREATION_CONFIG.get("min_chinese_chars", CREATION_CONFIG.get("total_target_length", 5000))
 
             # 创建摘要

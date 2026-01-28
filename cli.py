@@ -63,6 +63,7 @@ try:
     from utils import load_all_prompts
     from autogen_ext.models.openai import OpenAIChatCompletionClient
     from autogen_core.models import ModelInfo, ModelFamily
+    from src.text_proofreader import TextProofreader
 except ImportError as e:
     print(f"导入模块失败: {e}")
     print("当前搜索路径:", sys.path)
@@ -231,27 +232,59 @@ def run_generate_command(args: argparse.Namespace):
             print(f"❌ {e}")
             return
 
+        # 异步回调函数，用于进度更新和会议纪要输出
+        async def progress_callback(phase, step, message, progress=None):
+            # 如果参数是4个（带progress的情况）
+            if progress is not None:
+                # 限制进度值在0-1之间，确保进度显示的准确性
+                clamped_progress = max(0.0, min(1.0, progress))
+                print(f"[PROGRESS] {phase} - {step}: {message} (进度: {clamped_progress*100:.1f}%)")
+            else:
+                # 如果参数是3个，说明只有phase, step, message
+                print(f"[PROGRESS] {phase} - {step}: {message}")
+
+            # 输出会议纪要（增强输出）
+            conversation_manager = orchestrator.get_conversation_manager()
+            if hasattr(conversation_manager, 'print_meeting_minutes_summary'):
+                conversation_manager.print_meeting_minutes_summary()
+
         # 运行完整工作流
         print("\n🔄 开始故事生成流程...")
         result = await orchestrator.run_async_workflow(
             initial_idea=concept,
             multi_chapter=True,
             agent_handlers_map=agent_manager.create_agent_handlers_map(documentation_manager) if agent_manager else None,
+            progress_callback=progress_callback,  # 添加进度回调
             enable_manual_control=args.enable_manual_control
         )
 
         if result:
+            # 使用文本校对器优化最终故事格式
+            proofreader = TextProofreader()
+            corrected_final_story = proofreader.proofread_text(result['final_story'])
+
+            # 计算中文字符数量，这更符合用户关心的指标（包含扩展中文字符）
+            import re
+            # 匹配更广范围的中文字符，包括基本汉字、扩展A、B、C、D区以及中文标点符号
+            chinese_pattern = r'[\u4e00-\u9fff\u3400-\u4dbf\U00020000-\U0002a6df\U0002a700-\U0002b73f\U0002b740-\U0002b81f\U0002b820-\U0002ceaf\uf900-\ufaff\u3000-\u303f\uff00-\uffef]'
+            chinese_chars_count = len(re.findall(chinese_pattern, corrected_final_story))
+
+            # 生成并输出校对报告
+            report = proofreader.generate_proofreading_report(result['final_story'], corrected_final_story)
+            print(f"📈 校对优化完成，解决了 {len(report.get('improvements', []))} 类格式问题，长度变化: {report.get('length_difference', 0)} 字符")
+            print(f"📊 最终统计: {len(corrected_final_story)} 总字符 | {chinese_chars_count} 中文字符")
+
             # 保存结果
             output_dir = Path("output")
             output_dir.mkdir(exist_ok=True)
 
             # 保存最终故事
-            story_file = output_dir / f"generated_story_{len(result['final_story'])}.txt"
+            story_file = output_dir / f"generated_story_{len(corrected_final_story)}.txt"
             with open(story_file, 'w', encoding='utf-8') as f:
-                f.write(result['final_story'])
+                f.write(corrected_final_story)
 
             print(f"\n✅ 小说生成完成！")
-            print(f"📝 字数: {len(result['final_story'])}")
+            print(f"📝 字数: {len(corrected_final_story)}")
             print(f"💾 保存路径: {story_file}")
 
             # 显示会议纪要（如果存在）

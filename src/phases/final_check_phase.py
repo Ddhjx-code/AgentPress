@@ -111,6 +111,32 @@ class FinalCheckPhase:
 
         self.conversation_manager.add_final_check_report(final_check_report)
 
+        # 记录AI代理讨论会议纪要
+        participants = []
+        if self.agent_handlers_map.get_handler("fact_checker"):
+            participants.append("fact_checker")
+        if self.agent_handlers_map.get_handler("editor"):
+            participants.append("editor")
+        if self.agent_handlers_map.get_handler("documentation_specialist"):
+            participants.append("documentation_specialist")
+
+        meeting_summary = f"完成最终质量检查，检查了逻辑一致性、质量和结构完整性"
+        decisions = [
+            f"初始长度: {len(story)} 字符",
+            f"最终长度: {len(final_story)} 字符",
+            f"逻辑检查: {'是' if fact_checker_handler else '否'}",
+            f"质量评估: {'是' if editor_handler else '否'}",
+            f"连贯性检查: {'是' if doc_specialist_handler else '否'}"
+        ]
+        if hasattr(self.conversation_manager, 'add_meeting_minutes'):
+            self.conversation_manager.add_meeting_minutes(
+                stage="final_check_phase",
+                participants=participants,
+                summary=meeting_summary,
+                decisions=decisions,
+                turn_count=1  # 最终检查为一个阶段
+            )
+
         print(f"\\n🎯 最终检查完成")
         print(f"   - 初始长度: {len(story)} 字符")
         print(f"   - 最终长度: {len(final_story)} 字符")

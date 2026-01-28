@@ -111,11 +111,14 @@ class ReviewPhase:
 
             # 通知进度回调
             if self.progress_callback:
+                # 使用实际完成比例计算
+                progress_ratio = min(1.0, revision_round/MAX_REVISION_ROUNDS)
+                actual_progress = 0.5 + (progress_ratio * 0.5)  # 评审阶段从50%-100%
                 await self.progress_callback(
                     "评审阶段",
                     f"修订第{revision_round}轮",
-                    f"已完成第{revision_round}轮修订，当前得分{overall_score}",
-                    (revision_round/MAX_REVISION_ROUNDS)*0.5 + 0.5  # 最终阶段占据后50%
+                    f"已完成第{revision_round}轮修订 (共{MAX_REVISION_ROUNDS}轮)，当前得分{overall_score}",
+                    actual_progress
                 )
 
         # 记录评审结果
@@ -127,6 +130,33 @@ class ReviewPhase:
         }
 
         self.conversation_manager.add_review_summary(review_summary)
+
+        # 记录AI代理讨论会议纪要
+        participants = []
+        if self.agent_handlers_map.get_handler("editor"):
+            participants.append("editor")
+        if self.agent_handlers_map.get_handler("fact_checker"):
+            participants.append("fact_checker")
+        if self.agent_handlers_map.get_handler("dialogue_specialist"):
+            participants.append("dialogue_specialist")
+        if self.agent_handlers_map.get_handler("writer"):
+            participants.append("writer")
+
+        meeting_summary = f"完成多维度评审与修订，进行{revision_round}轮修订，质量得分{overall_score}/100"
+        decisions = [
+            f"初稿长度: {len(story)} 字符",
+            f"修订后长度: {len(current_version)} 字符",
+            f"修订轮次: {revision_round} 轮",
+            f"最终得分: {overall_score}/100"
+        ]
+        if hasattr(self.conversation_manager, 'add_meeting_minutes'):
+            self.conversation_manager.add_meeting_minutes(
+                stage="review_phase",
+                participants=participants,
+                summary=meeting_summary,
+                decisions=decisions,
+                turn_count=revision_round
+            )
 
         print(f"\\n📈 评审阶段完成统计")
         print(f"   - 修订轮次: {revision_round}")

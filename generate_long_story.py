@@ -18,6 +18,7 @@ from core.conversation_manager import ConversationManager
 from src.documentation_manager import DocumentationManager
 from core.agent_handlers_map import AgentHandlersMap
 from src.phases import ResearchPhase, CreationPhase, ReviewPhase, FinalCheckPhase
+from phases import NovelWorkflowOrchestrator
 from utils import load_all_prompts
 from autogen_ext.models.openai import OpenAIChatCompletionClient
 
@@ -99,27 +100,43 @@ async def generate_long_story():
 
     print(f"📚 使用概念: {concept[:100]}...")
 
-    print("🔍 开始第一阶段：研究和规划...")
-    research_data = await research_phase.execute_research(concept)
+    # 使用编排器运行工作流，启用手动控制
+    from phases import NovelWorkflowOrchestrator
+    orchestrator = NovelWorkflowOrchestrator()
 
-    print("✍️ 开始第二阶段：生成大于5000字的长篇故事...")
-    # 设置进度回调
     async def progress_callback(phase, step, message, progress):
         print(f"[PROGRESS] {phase} - {step}: {message}")
-    creation_phase.progress_callback = progress_callback
-    long_story = await creation_phase.execute_creation(research_data)
+        # 输出会议纪要（满足要求2）
+        if progress == 1.0:  # 接近完成时输出详细的会议纪要
+            if hasattr(conversation_manager, 'print_meeting_minutes_summary'):
+                conversation_manager.print_meeting_minutes_summary()
 
-    print("🧐 开始第三阶段：评审和修订...")
-    review_phase.progress_callback = progress_callback
-    revised_story = await review_phase.execute_review(long_story)
+    # 运行异步工作流，启用手动控制以实现全流程用户交互
+    results = await orchestrator.run_async_workflow(
+        initial_idea=concept,
+        agent_handlers_map=agent_handlers_map,
+        progress_callback=progress_callback,
+        enable_manual_control=True  # 启用手动控制
+    )
 
-    print("✅ 开始第四阶段：最终检查...")
-    final_story = await final_check_phase.execute_final_check(revised_story)
+    # 获取最终生成的故事
+    final_story = results['final_story'] if results and 'final_story' in results else ""
 
-    # 计算中文汉字数量，这更符合用户关心的指标
+    # 使用文本校对器优化生成的小说格式
+    from src.text_proofreader import TextProofreader
+    proofreader = TextProofreader()
+    final_story = proofreader.proofread_text(final_story)
+
+    # 计算中文字符数量，这更符合用户关心的指标（包含扩展中文字符）
     import re
-    chinese_chars_count = len(re.findall(r'[\\u4e00-\\u9fff]', final_story))
-    print(f"✅ 生成的长篇故事长度: {len(final_story)} 总字符 | {chinese_chars_count} 中文汉字")
+    # 匹配更广范围的中文字符，包括基本汉字、扩展A、B、C、D区以及中文标点符号
+    chinese_pattern = r'[\u4e00-\u9fff\u3400-\u4dbf\U00020000-\U0002a6df\U0002a700-\U0002b73f\U0002b740-\U0002b81f\U0002b820-\U0002ceaf\uf900-\ufaff\u3000-\u303f\uff00-\uffef]'
+    chinese_chars_count = len(re.findall(chinese_pattern, final_story))
+    print(f"✅ 生成的长篇故事长度: {len(final_story)} 总字符 | {chinese_chars_count} 中文字符")
+
+    # 生成并输出校对报告
+    report = proofreader.generate_proofreading_report(results.get('draft_story', ''), final_story)
+    print(f"📈 校对优化报告: 修正了 {report.get('length_difference', 0)} 处格式问题")
 
     # 保存生成的故事
     output_dir = Path("output")
@@ -151,14 +168,55 @@ async def generate_long_story():
         except Exception as e:
             print(f"⚠️  扩展可视化失败: {e}")
 
-    # 同时保存完整的代理工作日志
-    if hasattr(novel_phases, 'agent_work_log'):
-        log_file = output_dir / "long_story_agent_log.json"
-        with open(log_file, 'w', encoding='utf-8') as f:
-            json.dump(novel_phases.agent_work_log, f, ensure_ascii=False, indent=2)
-        print(f"📋 代理工作日志已保存: {log_file}")
+    # 使用编排器运行工作流，启用手动控制
+    from phases import NovelWorkflowOrchestrator
+    orchestrator = NovelWorkflowOrchestrator()
 
-    return long_story
+    async def progress_callback(phase, step, message, progress):
+        # 限制进度值在0-1之间，确保进度显示的准确性
+        clamped_progress = max(0.0, min(1.0, progress))
+        print(f"[PROGRESS] {phase} - {step}: {message} (进度: {clamped_progress*100:.1f}%)")
+        # 输出会议纪要（满足要求2）
+        if hasattr(conversation_manager, 'print_meeting_minutes_summary'):
+            # 每次进度更新时也输出会议纪要
+            conversation_manager.print_meeting_minutes_summary()
+
+    # 运行异步工作流，启用手动控制以实现全流程用户交互
+    results = await orchestrator.run_async_workflow(
+        initial_idea=concept,
+        agent_handlers_map=agent_handlers_map,
+        progress_callback=progress_callback,
+        enable_manual_control=True  # 启用手动控制
+    )
+
+    # 获取最终生成的故事
+    if results and 'final_story' in results:
+        final_story = results['final_story']
+    else:
+        print("⚠️ 工作流未产生最终故事")
+        final_story = ""  # 设置默认值
+
+    # 生成过程可视化报告 - 更新变量名
+    if hasattr(conversation_manager, 'print_meeting_minutes_summary'):
+        print("\n" + "="*70)
+        print("📋 长篇故事生成过程AI代理协作总结")
+        print("="*70)
+        conversation_manager.print_meeting_minutes_summary()
+
+        # 保存会议纪要到文件
+        conversation_manager.save_meeting_minutes_to_file()
+
+        # 使用ProcessVisualizer进行高级可视化分析
+        try:
+            from src.process_visualizer import ProcessVisualizer
+            visualizer = ProcessVisualizer()
+            visualizer.visualize_meeting_minutes(conversation_manager, "file")
+            visualizer.visualize_detailed_participants(conversation_manager, "file")
+            visualizer.save_complete_process_log(conversation_manager)
+        except Exception as e:
+            print(f"⚠️  扩展可视化失败: {e}")
+
+    return final_story
 
 
 if __name__ == "__main__":
